@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>闪购竞品情报日报</title>
+  <style>
+    :root {
+      --bg: #f5f7f2;
+      --fg: #20231f;
+      --muted: #687067;
+      --line: #dfe5da;
+      --surface: #fff;
+      --soft: #edf3eb;
+      --teal: #0f8f7c;
+      --coral: #d85c45;
+      --amber: #c58c1b;
+      --blue: #3d70b2;
+      --shadow: 0 18px 50px rgba(40, 49, 35, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, rgba(223,241,234,.9), rgba(245,247,242,0) 330px), var(--bg);
+      color: var(--fg);
+      font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    a { color: inherit; }
+    button, input, select, textarea { font: inherit; }
+    button, select { cursor: pointer; }
+    .shell { width: min(1480px, 100%); margin: 0 auto; padding: 24px; }
+    .topbar { display: flex; justify-content: space-between; gap: 20px; align-items: center; padding-bottom: 22px; }
+    .eyebrow, .label { margin: 0; color: var(--teal); font-size: 12px; font-weight: 800; }
+    h1 { margin: 6px 0 0; font-size: clamp(30px, 4vw, 48px); }
+    h2, h3 { margin: 0; }
+    .badge {
+      min-width: 168px; border: 1px solid var(--line); border-radius: 8px;
+      background: rgba(255,255,255,.74); padding: 14px 16px; box-shadow: var(--shadow);
+    }
+    .badge span, .metric span, .source span, label span, .candidate-meta span { display: block; color: var(--muted); font-size: 12px; }
+    .badge strong { display: block; margin-top: 4px; font-size: 20px; }
+    .toolbar { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin: 0 0 18px; }
+    .month-control { display: grid; gap: 7px; width: min(260px, 100%); }
+    .month-control span { color: var(--muted); font-size: 12px; font-weight: 800; }
+    .module { position: relative; }
+    .module-toggle {
+      display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px;
+      background: var(--surface); color: var(--fg); padding: 9px 12px; font-size: 13px; font-weight: 850;
+    }
+    .module-toggle svg { width: 16px; height: 16px; fill: currentColor; transition: transform .18s ease; }
+    .module.is-collapsed .module-toggle svg { transform: rotate(-90deg); }
+    .module.is-collapsed .collapsible-content { display: none !important; }
+    .module-actions { display: flex; gap: 8px; align-items: center; }
+    .module > .module-toggle:first-child { position: absolute; top: 14px; right: 14px; z-index: 2; }
+    .brief.module { padding-top: 64px; }
+    .metrics.module { position: relative; padding-top: 52px; }
+    .module-title { display: flex; justify-content: space-between; gap: 16px; align-items: start; margin-bottom: 16px; }
+    .module-title h2 { margin-top: 6px; font-size: 22px; }
+    .brief {
+      display: grid; grid-template-columns: minmax(0,1.35fr) minmax(340px,.65fr); gap: 24px;
+      padding: 28px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.9); box-shadow: var(--shadow);
+    }
+    .brief h2 { margin-top: 8px; max-width: 920px; font-size: clamp(24px,3vw,40px); line-height: 1.16; }
+    .brief p:last-child { max-width: 930px; margin: 16px 0 0; color: #3b433a; font-size: 16px; line-height: 1.8; }
+    .signals { display: grid; align-content: center; gap: 18px; border-left: 1px solid var(--line); padding-left: 24px; min-height: 230px; }
+    .signal { display: grid; grid-template-columns: 112px minmax(100px,1fr) 48px; gap: 12px; align-items: center; }
+    .signal span { color: #3b433a; font-size: 13px; font-weight: 750; }
+    .track { height: 10px; border-radius: 999px; overflow: hidden; background: #dce4d7; }
+    .fill { height: 100%; border-radius: inherit; }
+    .signal strong { text-align: right; font-size: 14px; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; margin: 18px 0 24px; }
+    .metric { min-height: 132px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.86); padding: 18px; }
+    .metric strong { display: block; margin-top: 14px; font-size: 42px; line-height: 1; }
+    .metric p { margin: 12px 0 0; color: var(--muted); font-size: 13px; }
+    .workspace { display: grid; grid-template-columns: minmax(0,1fr) 380px; gap: 24px; align-items: start; }
+    .board, .panel, .candidate-board { border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.9); box-shadow: var(--shadow); }
+    .board { padding: 22px; }
+    .panel { padding: 20px; }
+    .board-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; }
+    .board-head h2, .panel h2 { margin-top: 6px; font-size: 22px; }
+    .search { display: flex; align-items: center; gap: 10px; width: min(360px,100%); height: 44px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 0 12px; }
+    .search svg, .primary svg { width: 18px; height: 18px; fill: currentColor; flex: 0 0 auto; }
+    .search input { width: 100%; border: 0; outline: 0; background: transparent; }
+    .filters { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin: 18px 0; }
+    label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 800; }
+    input, select, textarea {
+      width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+      color: var(--fg); padding: 11px 12px; outline: 0;
+    }
+    input:focus, select:focus, textarea:focus, .search:focus-within { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(15,143,124,.14); }
+    .list { display: grid; gap: 12px; }
+    .candidate-board { margin-bottom: 24px; padding: 22px; }
+    .candidate-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 16px; }
+    .candidate-head h2 { margin-top: 6px; font-size: 22px; }
+    .candidate-list { display: grid; gap: 12px; }
+    .candidate-empty { border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); padding: 18px; line-height: 1.7; }
+    .candidate-card { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 16px; }
+    .candidate-top { display: flex; justify-content: space-between; gap: 14px; align-items: start; }
+    .candidate-top h3 { margin-top: 4px; font-size: 18px; line-height: 1.35; }
+    .score { min-width: 54px; border-radius: 8px; background: #dff1ea; color: #095f51; padding: 8px 10px; text-align: center; font-weight: 850; }
+    .candidate-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .candidate-actions button { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); padding: 9px 12px; font-size: 13px; font-weight: 850; }
+    .candidate-actions button:first-child { border-color: var(--teal); background: var(--teal); color: #fff; }
+    .candidate-actions button:last-child { color: var(--coral); }
+    .card { display: grid; grid-template-columns: 84px minmax(0,1fr); gap: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 16px; }
+    .date { display: grid; align-content: start; gap: 10px; }
+    .date span { color: var(--muted); font-size: 13px; font-weight: 800; }
+    .date strong { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; background: #dff1ea; color: #095f51; font-size: 15px; }
+    .title-row { display: flex; justify-content: space-between; gap: 14px; align-items: start; }
+    .platform { margin: 0 0 4px; color: var(--teal); font-size: 13px; font-weight: 850; }
+    .title-row h3 { font-size: 19px; line-height: 1.35; }
+    .pill { flex: 0 0 auto; border-radius: 999px; background: #e3ebf7; color: #214f86; padding: 7px 10px; font-size: 12px; font-weight: 850; }
+    .pill.pending { background: #f7ecd2; color: #835806; }
+    .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .tags span { border: 1px solid var(--line); border-radius: 999px; background: var(--soft); color: #3b433a; padding: 6px 9px; font-size: 12px; font-weight: 750; }
+    .summary, .judge { margin: 12px 0 0; font-size: 14px; line-height: 1.72; }
+    .judge { border-left: 3px solid var(--coral); padding-left: 12px; color: var(--muted); }
+    .source-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 14px; }
+    .source-row a, .source-row button { border: 0; background: transparent; color: var(--teal); font-size: 13px; font-weight: 850; text-decoration: none; }
+    .source-row button { color: var(--coral); }
+    .rail { display: grid; gap: 18px; }
+    form { display: grid; gap: 12px; margin-top: 16px; }
+    textarea { min-height: 112px; resize: vertical; }
+    .primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: 0; border-radius: 8px; background: var(--fg); color: #fff; font-weight: 850; }
+    .sources { display: grid; gap: 10px; margin-top: 16px; }
+    .source { display: grid; gap: 5px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 12px; }
+    .source strong { font-size: 14px; }
+    .source em { color: var(--coral); font-size: 12px; font-style: normal; font-weight: 850; }
+    .runbook { margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.65; }
+    .code-chip { display: inline-block; margin-top: 8px; border-radius: 8px; background: var(--soft); color: #3b433a; padding: 8px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    @media (max-width: 1100px) {
+      .brief, .workspace { grid-template-columns: 1fr; }
+      .signals { border-left: 0; border-top: 1px solid var(--line); padding: 20px 0 0; }
+      .rail { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 820px) {
+      .shell { padding: 16px; }
+      .topbar, .board-head, .candidate-head, .toolbar, .module-title { align-items: stretch; flex-direction: column; }
+      .badge, .search { width: 100%; }
+      .brief, .board, .panel { padding: 18px; }
+      .metrics, .filters, .rail { grid-template-columns: 1fr; }
+      .card { grid-template-columns: 1fr; }
+      .date { grid-template-columns: auto 1fr; align-items: center; }
+      .signal { grid-template-columns: 100px minmax(90px,1fr) 42px; }
+    }
+    @media (max-width: 520px) {
+      .brief h2 { font-size: 24px; }
+      .title-row { flex-direction: column; }
+      .pill { width: fit-content; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">闪购与同城跑腿竞品情报</p>
+        <h1>每日竞品动态汇总</h1>
+      </div>
+      <div class="badge"><span>最近更新</span><strong>2026-07-08</strong></div>
+    </header>
+
+    <div class="toolbar">
+      <label class="month-control"><span>查看月份</span><select id="month-filter"></select></label>
+      <div class="module-actions">
+        <button class="module-toggle" id="expand-all" type="button">全部展开</button>
+        <button class="module-toggle" id="collapse-all" type="button">全部收起</button>
+      </div>
+    </div>
+
+    <section class="brief module" data-module="brief">
+      <div class="collapsible-content" style="display: contents;">
+        <div>
+          <p class="label">今日摘要</p>
+          <h2>AI 入口、夏日场景和配送规则，是本轮最值得盯的三条线。</h2>
+          <p>6 月主线集中在淘宝闪购的夏季即时零售和 B 端 AI 工具、京东秒送的赛事夜宵组套、顺丰同城的骑手规则协商。7 月初顺丰接入支付宝 AI 生态，建议作为延续动作单独追踪。</p>
+        </div>
+        <div class="signals" aria-label="竞品动向分布">
+          <div class="signal"><span>AI 对话入口</span><div class="track"><div class="fill" style="width:74%;background:var(--teal)"></div></div><strong>31%</strong></div>
+          <div class="signal"><span>季节/赛事营销</span><div class="track"><div class="fill" style="width:67%;background:var(--coral)"></div></div><strong>28%</strong></div>
+          <div class="signal"><span>平台治理</span><div class="track"><div class="fill" style="width:53%;background:var(--amber)"></div></div><strong>22%</strong></div>
+          <div class="signal"><span>供给履约</span><div class="track"><div class="fill" style="width:46%;background:var(--blue)"></div></div><strong>19%</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="metrics module" aria-label="关键指标" data-module="metrics">
+      <article class="metric collapsible-content"><span id="metric-month-label">当前月份条目</span><strong id="metric-june">0</strong><p>按上方月份筛选统计</p></article>
+      <article class="metric collapsible-content"><span>高优先级信号</span><strong id="metric-high">0</strong><p>建议日报重点讨论</p></article>
+      <article class="metric collapsible-content"><span>AI 相关动作</span><strong id="metric-ai">0</strong><p>按当前月份统计</p></article>
+      <article class="metric collapsible-content"><span>待复核线索</span><strong id="metric-review">0</strong><p>需要二次查证</p></article>
+    </section>
+
+    <section class="candidate-board module" aria-label="自动抓取候选" data-module="candidates">
+      <div class="candidate-head">
+        <div>
+          <p class="label">自动候选池</p>
+          <h2>每日抓取后先放这里，确认后再进入正式日报</h2>
+        </div>
+        <div class="module-actions">
+          <div class="badge"><span>候选更新时间</span><strong id="candidate-updated">待运行</strong></div>
+        </div>
+      </div>
+      <div class="candidate-list collapsible-content" id="candidate-list"></div>
+    </section>
+
+    <section class="workspace">
+      <div class="board module" data-module="intel-list">
+        <div class="board-head">
+          <div><p class="label">情报列表</p><h2>按平台、类型和状态筛选</h2></div>
+          <div class="search">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10.8 18.6a7.8 7.8 0 1 1 5.5-2.3l4 4-1.4 1.4-4-4a7.8 7.8 0 0 1-4.1 1.1Zm0-2a5.8 5.8 0 1 0 0-11.6 5.8 5.8 0 0 0 0 11.6Z"/></svg>
+            <input id="search" placeholder="搜索平台、标题、判断" />
+          </div>
+        </div>
+        <div class="filters">
+          <label><span>月份</span><select id="list-month-filter"></select></label>
+          <label><span>平台</span><select id="platform"></select></label>
+          <label><span>类型</span><select id="category"></select></label>
+          <label><span>状态</span><select id="status"></select></label>
+        </div>
+        <div class="list collapsible-content" id="list"></div>
+      </div>
+
+      <aside class="rail">
+        <section class="panel module" data-module="capture">
+          <div class="module-title">
+            <div><p class="label">每日录入</p><h2>添加新线索</h2></div>
+          </div>
+          <form id="capture-form" class="collapsible-content">
+            <label>日期<input id="date" type="date" value="2026-07-08" /></label>
+            <label>平台<input id="new-platform" placeholder="例如 顺丰同城" /></label>
+            <label>标题<input id="title" placeholder="一句话概括动作" /></label>
+            <label>类型<select id="new-category"></select></label>
+            <label>摘要<textarea id="summary" placeholder="记录功能、活动、入口、权益或影响范围"></textarea></label>
+            <label>来源链接<input id="source" placeholder="https://" /></label>
+            <button class="primary" type="submit">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z"/></svg>
+              加入日报
+            </button>
+          </form>
+        </section>
+
+        <section class="panel module" data-module="sources">
+          <div class="module-title">
+            <div><p class="label">采集队列</p><h2>每日固定来源</h2></div>
+          </div>
+          <div class="sources collapsible-content">
+            <div class="source"><strong>36氪</strong><span>融资、快讯、平台战略</span><em>每日 09:30 / 17:30</em></div>
+            <div class="source"><strong>虎嗅</strong><span>评论、监管、竞争格局</span><em>每日 10:00</em></div>
+            <div class="source"><strong>技术团队公众号</strong><span>AI、履约、工程能力</span><em>每周二/四</em></div>
+            <div class="source"><strong>平台官方与地方媒体</strong><span>新功能、活动、政策协同</span><em>每日滚动</em></div>
+            <div class="source"><strong>公众号检索</strong><span>活动口径、商家端工具、服务商生态</span><em>每日 18:00</em></div>
+            <p class="runbook">本地自动抓取脚本会搜索这些来源，提取候选线索并写回本页面。公众号结果只进入候选池，不直接入库。</p>
+            <span class="code-chip">python3 outputs/auto_update_intel.py</span>
+          </div>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const baseIntel = [
+      {id:"taobao-food-safety-ai",date:"2026-06-01",platform:"淘宝闪购",title:"3+1+AI 食安治理体系升级",type:"治理 / 商户准入",category:"平台治理",summary:"新规生效后，新签餐饮商户 100% 多维度实质性核验；骑士随手拍扩展至全国 48 城，AI 识别证照、门头、后厨直播巡检等线索。",judge:"餐饮供给侧进入更强准入和巡检周期，平台会把食安确定性包装成闪购/外卖信任资产。",sourceName:"TechWeb",sourceUrl:"https://www.techweb.com.cn/internet/2026-05-28/2976079.shtml",status:"已核验",priority:"高"},
+      {id:"taobao-ice-festival",date:"2026-06-06",platform:"淘宝闪购",title:"冰冰节开启，联合百万商家做夏日即时零售",type:"夏季营销活动",category:"营销活动",summary:"覆盖防晒、宠物消暑、零食、美妆、个护、家电等；美的、海尔等提供即买、即送、即装的一站式清凉消费体验。",judge:"淘宝闪购在用季节场景扩展非餐心智，家电安装服务把履约从送达延伸到服务完成。",sourceName:"36氪",sourceUrl:"https://www.36kr.com/newsflashes/3841144920459784",status:"已核验",priority:"高"},
+      {id:"taobao-front-warehouse",date:"2026-06-10",platform:"淘宝闪购",title:"即时零售换挡：加码便利店、盒马前置仓",type:"战略动向",category:"供给履约",summary:"报道称淘宝闪购 2027 财年目标转向零售业务，发展淘宝便利店、盒马前置仓，以及天猫超市和天猫品牌远转近。",judge:"阿里即时零售重点从补贴外卖转向前置仓和近场货盘，竞争会更像仓网密度与品类效率之争。",sourceName:"36氪",sourceUrl:"https://36kr.com/p/3847243593599235",status:"待复核",priority:"中"},
+      {id:"sf-rider-timeout",date:"2026-06-29",platform:"顺丰同城",title:"全面推广骑手超时免罚挑战机制",type:"骑手权益 / 算法规则",category:"配送体验",summary:"在劳动规则与算法协商背景下推广，降低复杂履约场景导致的超时处罚风险。",judge:"即时配送平台正在把算法透明和骑手保障变成供给稳定能力，后续可能影响骑手留存和服务承诺口径。",sourceName:"广东省总工会",sourceUrl:"https://www.gdftu.org.cn/xwzx/rdgz/content/post_1331142.html",status:"已核验",priority:"中"},
+      {id:"shansong-ai-order",date:"2026-06-25",platform:"闪送",title:"上线 AI 智能下单功能",type:"AI 智能下单",category:"AI入口",summary:"闪送 APP 下单页新增 AI 下单入口，用户可用语音或文字描述寄件、收件信息，系统自动识别地址、手机号等核心订单信息并生成配送订单。",judge:"一对一急送平台把 AI 前置到下单链路，核心价值是降低同城配送信息填写门槛，并减少地址、联系方式等人工录入错误。",sourceName:"新浪财经 / 大象新闻",sourceUrl:"https://finance.sina.cn/stock/jdts/2026-06-25/detail-inieqwsy5766689.d.html",status:"已核验",priority:"高"},
+      {id:"jd-football-meal",date:"2026-06-30",platform:"京东外卖 / 秒送",title:"上线看球必吃套餐",type:"赛事夜宵活动",category:"营销活动",summary:"京东 APP 秒送频道上线看球套餐会场，AI 智能组套，近 200 个品牌，套餐 10 元起，满 90 元自动升级 1 对 1 直送。",judge:"京东把世界杯夜宵需求与秒送入口绑定，借 AI 组套降低用户选择成本，并强化高客单履约体验。",sourceName:"中国经济网",sourceUrl:"http://finance.ce.cn/home/jrzq/dc/202606/t20260630_3061438.shtml",status:"已核验",priority:"高"},
+      {id:"taobao-ai-claw",date:"2026-06-30",platform:"淘宝闪购",title:"燎原深耕计划 2.0，首发闪购助手",type:"B 端 AI 工具",category:"AI入口",summary:"开放新签、代运营、硬件、商业化渠道四大服务商合作场景；首发服务商代运营工作台 AI Claw 闪购助手。",judge:"即时零售运营能力向服务商生态下沉，商户诊断、店装制图、异常巡检会被工具化。",sourceName:"同花顺转载 IT之家",sourceUrl:"https://news.10jqka.com.cn/20260630/c677830378.shtml",status:"已核验",priority:"高"},
+      {id:"sf-alipay-ai",date:"2026-07-07",platform:"顺丰同城",title:"接入支付宝 AI 生态，一句话叫跑腿",type:"AI 对话入口",category:"AI入口",summary:"用户在 AI 版支付宝阿宝对话界面发出跑腿指令，可唤起我的快递跑腿服务卡片，并用顺丰同城完成下单。",judge:"跑腿入口从搜索和小程序前移到 AI 对话，第三方即配有机会成为品牌小程序 AI 服务链路的履约底座。",sourceName:"京报网",sourceUrl:"https://news.bjd.com.cn/2026/07/07/11850108.shtml",status:"7月追踪",priority:"高"}
+    ];
+    // AUTO_CANDIDATES_START
+    const generatedCandidates = [
+      {
+            "id": "auto-e4c27e931b33",
+            "date": "2026-07-08",
+            "platform": "支付宝",
+            "title": "支付宝 AI 生态 上新 :蜂鸟 跑腿 已 接入 ,一句话发起 同城跑腿 - IT之家",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "6小时前 - 支付宝 AI 开放平台支持商家服务 一次 接入 ,多端分发,统一管理 ,这意味着,未来蜂鸟 跑腿 覆盖全国的即时配送服务不局限于 阿宝 ,还能同步落地车机、 AI 眼...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "www.ithome.com",
+            "sourceUrl": "https://www.ithome.com/0/974/034.htm",
+            "score": 99
+      },
+      {
+            "id": "auto-854f633fa44a",
+            "date": "2026-07-04",
+            "platform": "UU跑腿",
+            "title": "UU 跑腿 上线 跑腿Skill,AI助手 可直接调用 同城配送 服务|服务类型|订单|龙虾|...",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "5天前 - 用户在AI 助手 中通过自然语言即可完成下单、订单查询及骑手位置追踪,无需跳转至UU 跑腿 APP。.安装方面,OpenClaw用户在ClawHub搜索uupt-delivery即可一键...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "finance.sina.cn",
+            "sourceUrl": "https://finance.sina.cn/tech/2026-07-04/detail-inifqfhq3525767.d.html",
+            "score": 99
+      },
+      {
+            "id": "auto-625434a4b0e2",
+            "date": "2026-06-30",
+            "platform": "京东外卖",
+            "title": "球迷狂欢季来袭! 京东外卖上线 看球必吃套餐 ,全品类夜宵低至 10 元起_...",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "2026年6月30日 - 6月30日, 京东 外卖正式 上线 看球必吃套餐 ,通过AI智能组套精选搭配. 看球必吃套餐 活动持续至 7月 20日,消费者登录 京东 APP进入 秒送 频道,搜索关键词 看...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "中国经济网",
+            "sourceUrl": "http://finance.ce.cn/home/jrzq/dc/202606/t20260630_3061438.shtml",
+            "score": 99
+      },
+      {
+            "id": "auto-22aa8787c7aa",
+            "date": "2026-06-26",
+            "platform": "闪送",
+            "title": "抖音电商强化食品类商品管理规范;闪送App上线 AI智能下单 功能 | 未来商业...",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "2026年6月26日 - 点评:在同城即时配送赛道产品功能日趋同质化的背景下,AI 智能 下单功能这种将服务标准与AI能力结合的前置体验优化,有助于强化闪送 一对一 专属急送的差异...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "www.nbd.com.cn",
+            "sourceUrl": "https://www.nbd.com.cn/articles/2026-06-25/4437663.html",
+            "score": 99
+      },
+      {
+            "id": "auto-f586ec8e12cc",
+            "date": "2026-06-25",
+            "platform": "美团跑腿",
+            "title": "大白话可下单!多家 AI助手 上线美团 跑腿Skill 提供一站式 同城 服务_上观新闻",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "2026年6月25日 - 跑腿 Skill的发布,意味着无论用户使用哪个AI 助手 ,说一句话就能调用美团 跑腿 完成下单,系统自动完成场景识别、地址匹配、价格预估与订单提交,将原本多步...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "www.shobserver.cn",
+            "sourceUrl": "https://www.shobserver.cn/news/detail?id=1118096",
+            "score": 99
+      },
+      {
+            "id": "auto-a2dd29ea348b",
+            "date": "2026-05-27",
+            "platform": "美团跑腿",
+            "title": "美团发布 跑腿Skill ,接上各家 AI 的腿",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "2026年5月27日 - Skill接入美团 跑腿 地址簿,自动拉取常用地址;物品信息由AI识别品类;下单前展示完整订单预览卡片;下单后可直接向AI 助手 查询骑手实时 配送 进度. 跑腿 Skill...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "www.guancha.cn",
+            "sourceUrl": "https://www.guancha.cn/economy/2026_05_27_818554.shtml",
+            "score": 99
+      },
+      {
+            "id": "auto-2d3db2be7a4c",
+            "date": "2026-05-26",
+            "platform": "美团跑腿",
+            "title": "美团 发布 跑腿Skill ,用户通过任意AI助手即可一句话完成下单 - 今日头条",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "2026年5月26日 - 中国食品报融媒体近日,多家AI助手接入 美团 跑腿,为用户提供一站式同城服务,同期 美团 发布 跑腿Skill ,将 跑腿 下单能力以封装Skill形式向AI助手生态开放.2...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "www.toutiao.com",
+            "sourceUrl": "https://www.toutiao.com/article/7644093197458670114/",
+            "score": 99
+      },
+      {
+            "id": "auto-c33e399cdc4c",
+            "date": "2026-07-07",
+            "platform": "顺丰同城",
+            "title": "顺丰同城首批接入支付宝 AI 生态",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "22小时前 - 顺丰同城(HK9699)还基于独立第三方定位承接众多品牌小程序私域 配送 ,助力商家在AI服务链路中完成履约闭环.目前,AI版支付宝同时支持联动餐饮外卖、 即时 ...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "同花顺",
+            "sourceUrl": "http://stock.10jqka.com.cn/20260707/c678019188.shtml",
+            "score": 98
+      },
+      {
+            "id": "auto-fe6c2537d9b9",
+            "date": "2026-07-07",
+            "platform": "顺丰同城",
+            "title": "顺丰 同城 正式 接入 支付宝 AI 生态,打造 一句话叫 跑腿 新体验_京报网",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "1天前 - 用户可通过自然对话,用顺丰 同城 服务完成下单,获得更灵活、轻量化的 同城 急送服务体验.在AI版支付宝中,用户在 阿宝 对话界面发出 帮我叫个 跑腿 等跑腿指...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "京报网",
+            "sourceUrl": "https://news.bjd.com.cn/2026/07/07/11850108.shtml",
+            "score": 98
+      },
+      {
+            "id": "auto-68414666bc9e",
+            "date": "2026-05-26",
+            "platform": "美团跑腿",
+            "title": "美团 跑腿 发布Skill 接入AI Agent生态,多步表单操作压缩为单轮对话-36氪",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "搜索结果未提供摘要，请打开来源复核。",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "36氪",
+            "sourceUrl": "https://www.36kr.com/newsflashes/3825757712798345",
+            "score": 94
+      },
+      {
+            "id": "auto-8e8f9d3ed0d6",
+            "date": "2026-05-26",
+            "platform": "待识别平台",
+            "title": "美团 发布 跑腿Skill ,可接入多家AI助手",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "搜索结果未提供摘要，请打开来源复核。",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "同花顺",
+            "sourceUrl": "http://stock.10jqka.com.cn/20260526/c676988328.shtml",
+            "score": 92
+      },
+      {
+            "id": "auto-480bcd2df962",
+            "date": "2026-05-26",
+            "platform": "待识别平台",
+            "title": "美团发布 跑腿 Skill ,可 接入 多家 AI 助手|美团| AI | 跑腿 _新浪科技_新浪网",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "搜索结果未提供摘要，请打开来源复核。",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "finance.sina.com.cn",
+            "sourceUrl": "https://finance.sina.com.cn/tech/roll/2026-05-26/doc-inhzfshi2188465.shtml",
+            "score": 92
+      },
+      {
+            "id": "auto-fdf37fd060b7",
+            "date": "2026-07-08",
+            "platform": "顺丰同城",
+            "title": "顺丰 同城 正式 接入 支付宝 AI 生态",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "3小时前 - 顺丰 同城 (HK9699)近日已 接入 支付宝AI生态,用户可在AI版支付宝中通过自然对话,用.例如,用户在 阿宝 对话界面发出 帮我叫个 跑腿 等跑腿指令后,可唤起 我...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "同花顺",
+            "sourceUrl": "http://stock.10jqka.com.cn/hks/20260708/c678041031.shtml",
+            "score": 90
+      },
+      {
+            "id": "auto-f8caa1f74e48",
+            "date": "2026-05-26",
+            "platform": "美团跑腿",
+            "title": "大白话可下单!多家 AI 助手 上线 美团 跑腿 Skill 提供一站式 同城 服务 _ 东方...",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "搜索结果未提供摘要，请打开来源复核。",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "finance.eastmoney.com",
+            "sourceUrl": "https://finance.eastmoney.com/a/202605263749574469.html",
+            "score": 90
+      },
+      {
+            "id": "auto-d8b5256d0ffe",
+            "date": "2026-07-08",
+            "platform": "顺丰同城",
+            "title": "热点资讯:顺丰 同城 接入滴滴快送;WPS AI 官网上线……_办公_汽车_智能",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "搜索结果未提供摘要，请打开来源复核。",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "www.sohu.com",
+            "sourceUrl": "https://www.sohu.com/a/695534508_792551",
+            "score": 86
+      },
+      {
+            "id": "auto-0402bfa7ffd7",
+            "date": "2026-07-08",
+            "platform": "顺丰同城",
+            "title": "顺丰 同城 正式 接入 支付宝 AI 生态|快递|点餐|代买_网易订阅",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "3小时前 - 例如,用户在 阿宝 对话界面发出 帮我叫个 跑腿 等跑腿指令后,可唤起 我的快递 跑腿 服务卡片,输入地址信息,即可用顺丰 同城 下单点餐购物、帮取帮送、代买...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "www.163.com",
+            "sourceUrl": "https://www.163.com/dy/article/L1B51O730519DFFO.html",
+            "score": 84
+      },
+      {
+            "id": "auto-df9d377a531d",
+            "date": "2026-06-30",
+            "platform": "淘宝闪购",
+            "title": "淘宝闪购 升级 燎原深耕计划 2.0 :首发 闪购助手 ,开放四大 服务商 合作场景",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "2026年6月30日 - 此次大会上, 淘宝 闪购正式首发 服务商 代运营工作台 AI Claw—— 闪购 助手 ,并全景展示了覆盖从平台到商户的四层智能化运营体系. 淘宝 闪购副总裁欧云峰在...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "同花顺",
+            "sourceUrl": "http://news.10jqka.com.cn/20260630/c677830378.shtml",
+            "score": 80
+      },
+      {
+            "id": "auto-7c8d8b560454",
+            "date": "2026-07-08",
+            "platform": "京东秒送",
+            "title": "即时零售 京东 秒送 支持 2026年 国补 北上广等地同步 上线 _广州日报大洋网",
+            "type": "自动候选",
+            "category": "待归类",
+            "summary": "搜索结果未提供摘要，请打开来源复核。",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "news.dayoo.com",
+            "sourceUrl": "https://news.dayoo.com/finance/202601/27/171077_54921821.htm",
+            "score": 78
+      },
+      {
+            "id": "auto-3e3da6873617",
+            "date": "2026-06-28",
+            "platform": "闪送",
+            "title": "美团CEO王兴回应股价低迷;京东在欧洲推出机器人维修服务 | 一周未来...",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "2026年6月28日 - 点评:在同城即时配送赛道产品功能日趋同质化的背景下,AI 智能 下单功能这种将服务标准与AI能力结合的前置体验优化,有助于强化闪送 一对一 专属急送的差异...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "finance.eastmoney.com",
+            "sourceUrl": "https://finance.eastmoney.com/a/202606283785629243.html",
+            "score": 78
+      },
+      {
+            "id": "auto-39aa19ae60aa",
+            "date": "2026-07-08",
+            "platform": "顺丰同城",
+            "title": "顺丰同城接入AI 版支付宝 阿宝",
+            "type": "自动候选",
+            "category": "AI入口",
+            "summary": "5小时前 - 顺丰 同城(HK9699)目前已 接入 该支付宝AI生态。. 顺丰 同城(HK9699)服务完成下单,获得更灵活、轻量化的 同城 急送服务体验...",
+            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+            "sourceName": "同花顺",
+            "sourceUrl": "http://stock.10jqka.com.cn/hks/20260708/c678034881.shtml",
+            "score": 76
+      }
+];
+    const generatedMeta = {"updatedAt": "2026-07-08 21:07", "sourceCount": 42};
+    // AUTO_CANDIDATES_END
+    const storageKey = "quick-commerce-intel-custom-items";
+    const ignoredCandidateKey = "quick-commerce-intel-ignored-candidates";
+    const collapsedModulesKey = "quick-commerce-intel-collapsed-modules";
+    const els = {
+      list: document.getElementById("list"),
+      search: document.getElementById("search"),
+      month: document.getElementById("month-filter"),
+      listMonth: document.getElementById("list-month-filter"),
+      platform: document.getElementById("platform"),
+      category: document.getElementById("category"),
+      status: document.getElementById("status"),
+      newCategory: document.getElementById("new-category"),
+      form: document.getElementById("capture-form")
+    };
+    const getCustom = () => JSON.parse(localStorage.getItem(storageKey) || "[]");
+    const setCustom = items => localStorage.setItem(storageKey, JSON.stringify(items));
+    const getIgnored = () => JSON.parse(localStorage.getItem(ignoredCandidateKey) || "[]");
+    const setIgnored = items => localStorage.setItem(ignoredCandidateKey, JSON.stringify(items));
+    const allItems = () => [...baseIntel, ...getCustom()].sort((a, b) => b.date.localeCompare(a.date));
+    const itemMonth = item => (item.date || "").slice(0, 7);
+    const currentMonth = () => selectedMonthFrom(els.month);
+    const inSelectedMonth = item => currentMonth() === "全部月份" || itemMonth(item) === currentMonth();
+    function unique(values, first) { return [first, ...Array.from(new Set(values))]; }
+    function optionList(select, values) { select.innerHTML = values.map(v => `<option>${v}</option>`).join(""); }
+    function monthLabel(month) {
+      if (month === "全部月份") return "全部月份";
+      const [year, value] = month.split("-");
+      return `${year}年${Number(value)}月`;
+    }
+    function allMonths() {
+      const months = [...allItems(), ...generatedCandidates]
+        .map(itemMonth)
+        .filter(Boolean)
+        .sort()
+        .reverse();
+      return unique(months, "全部月份");
+    }
+    function renderFilters() {
+      const items = allItems();
+      const monthValue = currentMonth();
+      const months = allMonths();
+      optionList(els.month, months.map(month => monthLabel(month)));
+      optionList(els.listMonth, months.map(month => monthLabel(month)));
+      els.month.dataset.values = JSON.stringify(months);
+      els.listMonth.dataset.values = JSON.stringify(months);
+      const nextIndex = Math.max(0, months.indexOf(monthValue));
+      els.month.selectedIndex = nextIndex;
+      els.listMonth.selectedIndex = nextIndex;
+      optionList(els.platform, unique(items.map(i => i.platform), "全部平台"));
+      optionList(els.category, unique(items.map(i => i.category), "全部类型"));
+      optionList(els.status, ["全部状态", "已核验", "待复核", "7月追踪"]);
+      optionList(els.newCategory, unique(items.map(i => i.category), "AI入口").filter(v => v !== "全部类型"));
+    }
+    function renderMetrics(items) {
+      const scoped = items.filter(inSelectedMonth);
+      document.getElementById("metric-month-label").textContent = `${monthLabel(currentMonth())}条目`;
+      document.getElementById("metric-june").textContent = scoped.length;
+      document.getElementById("metric-high").textContent = scoped.filter(i => i.priority === "高").length;
+      document.getElementById("metric-ai").textContent = scoped.filter(i => i.category === "AI入口").length;
+      document.getElementById("metric-review").textContent = scoped.filter(i => i.status === "待复核").length;
+    }
+    function currentCandidates() {
+      const existingUrls = new Set(allItems().map(item => item.sourceUrl));
+      const ignored = new Set(getIgnored());
+      return generatedCandidates
+        .filter(item => !ignored.has(item.id))
+        .filter(item => !existingUrls.has(item.sourceUrl))
+        .filter(inSelectedMonth)
+        .sort((a, b) => (b.score || 0) - (a.score || 0));
+    }
+    function renderCandidates() {
+      const list = document.getElementById("candidate-list");
+      const updated = document.getElementById("candidate-updated");
+      updated.textContent = generatedMeta.updatedAt || "待运行";
+      const candidates = currentCandidates();
+      if (!candidates.length) {
+        list.innerHTML = `<div class="candidate-empty">${monthLabel(currentMonth())}暂无未处理候选。运行本地抓取脚本后，新线索会出现在这里；已经确认或忽略的候选不会重复出现。</div>`;
+        return;
+      }
+      list.innerHTML = candidates.map(item => `
+        <article class="candidate-card">
+          <div class="candidate-top">
+            <div>
+              <p class="platform">${item.platform || "待识别平台"} · ${item.date || "日期待识别"}</p>
+              <h3>${item.title}</h3>
+            </div>
+            <div class="score">${item.score || 0}</div>
+          </div>
+          <p class="summary">${item.summary}</p>
+          <div class="tags"><span>${item.category || "候选"}</span><span>${item.sourceName || "自动抓取"}</span></div>
+          <div class="source-row">
+            <a href="${item.sourceUrl}" target="_blank" rel="noreferrer">查看来源</a>
+            <div class="candidate-actions">
+              <button data-accept="${item.id}" type="button">确认入库</button>
+              <button data-ignore="${item.id}" type="button">忽略</button>
+            </div>
+          </div>
+        </article>`).join("");
+      list.querySelectorAll("[data-accept]").forEach(button => {
+        button.addEventListener("click", () => {
+          const item = generatedCandidates.find(candidate => candidate.id === button.dataset.accept);
+          if (!item) return;
+          const saved = {
+            id: `custom-${item.id}`,
+            date: item.date || "2026-07-08",
+            platform: item.platform || "待识别平台",
+            title: item.title,
+            type: item.type || "自动候选",
+            category: item.category || "待归类",
+            summary: item.summary,
+            judge: item.judge || "自动抓取候选，已确认入库，建议在日报会上补充业务影响判断。",
+            sourceName: item.sourceName || "自动抓取",
+            sourceUrl: item.sourceUrl,
+            status: "待复核",
+            priority: item.score >= 80 ? "高" : "中"
+          };
+          setCustom([saved, ...getCustom()]);
+          setIgnored([...new Set([...getIgnored(), item.id])]);
+          renderFilters();
+          renderCandidates();
+          renderList();
+        });
+      });
+      list.querySelectorAll("[data-ignore]").forEach(button => {
+        button.addEventListener("click", () => {
+          setIgnored([...new Set([...getIgnored(), button.dataset.ignore])]);
+          renderCandidates();
+        });
+      });
+    }
+    function renderList() {
+      const q = els.search.value.trim().toLowerCase();
+      const platform = els.platform.value || "全部平台";
+      const category = els.category.value || "全部类型";
+      const status = els.status.value || "全部状态";
+      const items = allItems();
+      renderMetrics(items);
+      const filtered = items.filter(item => {
+        const text = `${item.platform} ${item.title} ${item.summary} ${item.judge}`.toLowerCase();
+        return (platform === "全部平台" || item.platform === platform)
+          && (category === "全部类型" || item.category === category)
+          && (status === "全部状态" || item.status === status)
+          && inSelectedMonth(item)
+          && text.includes(q);
+      });
+      els.list.innerHTML = filtered.map(item => `
+        <article class="card">
+          <div class="date"><span>${item.date.slice(5)}</span><strong>${item.priority}</strong></div>
+          <div>
+            <div class="title-row">
+              <div><p class="platform">${item.platform}</p><h3>${item.title}</h3></div>
+              <span class="pill ${item.status === "待复核" ? "pending" : ""}">${item.status}</span>
+            </div>
+            <div class="tags"><span>${item.category}</span><span>${item.type}</span></div>
+            <p class="summary">${item.summary}</p>
+            <p class="judge">${item.judge}</p>
+            <div class="source-row">
+              <a href="${item.sourceUrl}" target="_blank" rel="noreferrer">${item.sourceName}</a>
+              ${item.id.startsWith("custom-") ? `<button data-remove="${item.id}" type="button">删除</button>` : ""}
+            </div>
+          </div>
+        </article>`).join("");
+      els.list.querySelectorAll("[data-remove]").forEach(button => {
+        button.addEventListener("click", () => {
+          setCustom(getCustom().filter(item => item.id !== button.dataset.remove));
+          renderFilters();
+          renderCandidates();
+          renderList();
+        });
+      });
+    }
+    els.form.addEventListener("submit", event => {
+      event.preventDefault();
+      const item = {
+        id: `custom-${Date.now()}`,
+        date: document.getElementById("date").value || "2026-07-08",
+        platform: document.getElementById("new-platform").value.trim(),
+        title: document.getElementById("title").value.trim(),
+        type: "手动录入",
+        category: els.newCategory.value,
+        summary: document.getElementById("summary").value.trim(),
+        judge: "待产品经理补充判断，可在日报会上确认影响级别。",
+        sourceName: document.getElementById("source").value.trim() ? "手动来源" : "未填来源",
+        sourceUrl: document.getElementById("source").value.trim() || "#",
+        status: "待复核",
+        priority: "中"
+      };
+      if (!item.platform || !item.title || !item.summary) return;
+      setCustom([item, ...getCustom()]);
+      event.target.reset();
+      document.getElementById("date").value = "2026-07-08";
+      renderFilters();
+      renderCandidates();
+      renderList();
+    });
+    function selectedMonthFrom(select) {
+      const values = JSON.parse(select.dataset.values || "[]");
+      return values[select.selectedIndex] || "全部月份";
+    }
+    function syncMonth(select) {
+      const values = allMonths();
+      const selected = selectedMonthFrom(select);
+      els.month.value = monthLabel(selected);
+      els.listMonth.value = monthLabel(selected);
+      els.month.selectedIndex = Math.max(0, values.indexOf(selected));
+      els.listMonth.selectedIndex = Math.max(0, values.indexOf(selected));
+      renderCandidates();
+      renderList();
+    }
+    function initCollapsibleModules() {
+      const collapsed = new Set(JSON.parse(localStorage.getItem(collapsedModulesKey) || "[]"));
+      document.querySelectorAll(".module[data-module]").forEach(module => {
+        const key = module.dataset.module;
+        const button = document.createElement("button");
+        button.className = "module-toggle";
+        button.type = "button";
+        button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7Z"/></svg><span>收起</span>';
+        const header = module.querySelector(".candidate-head, .board-head, .module-title");
+        if (header) {
+          let actions = header.querySelector(".module-actions");
+          if (!actions) {
+            actions = document.createElement("div");
+            actions.className = "module-actions";
+            header.appendChild(actions);
+          }
+          actions.appendChild(button);
+        } else {
+          module.prepend(button);
+        }
+        if (collapsed.has(key)) module.classList.add("is-collapsed");
+        button.querySelector("span").textContent = module.classList.contains("is-collapsed") ? "展开" : "收起";
+        button.addEventListener("click", () => {
+          module.classList.toggle("is-collapsed");
+          const next = new Set(JSON.parse(localStorage.getItem(collapsedModulesKey) || "[]"));
+          if (module.classList.contains("is-collapsed")) next.add(key);
+          else next.delete(key);
+          localStorage.setItem(collapsedModulesKey, JSON.stringify([...next]));
+          button.querySelector("span").textContent = module.classList.contains("is-collapsed") ? "展开" : "收起";
+        });
+      });
+      document.getElementById("expand-all").addEventListener("click", () => {
+        localStorage.setItem(collapsedModulesKey, "[]");
+        document.querySelectorAll(".module").forEach(module => module.classList.remove("is-collapsed"));
+        document.querySelectorAll(".module .module-toggle span").forEach(span => span.textContent = "收起");
+      });
+      document.getElementById("collapse-all").addEventListener("click", () => {
+        const keys = [...document.querySelectorAll(".module[data-module]")].map(module => module.dataset.module);
+        localStorage.setItem(collapsedModulesKey, JSON.stringify(keys));
+        document.querySelectorAll(".module").forEach(module => module.classList.add("is-collapsed"));
+        document.querySelectorAll(".module .module-toggle span").forEach(span => span.textContent = "展开");
+      });
+    }
+    ["input", "change"].forEach(type => {
+      els.search.addEventListener(type, renderList);
+      els.platform.addEventListener(type, renderList);
+      els.category.addEventListener(type, renderList);
+      els.status.addEventListener(type, renderList);
+    });
+    els.month.addEventListener("change", () => syncMonth(els.month));
+    els.listMonth.addEventListener("change", () => syncMonth(els.listMonth));
+    renderFilters();
+    initCollapsibleModules();
+    renderCandidates();
+    renderList();
+  </script>
+</body>
+</html>
