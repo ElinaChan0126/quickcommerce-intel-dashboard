@@ -118,7 +118,6 @@
     .tags button { cursor: pointer; }
     .tags .business-pill { border-color: transparent; color: #fff; }
     .tags .business-empty { background: #fff; border-style: dashed; color: var(--muted); }
-    .tags .relevance-pill { background: #eef6ff; border-color: #c7ddf8; color: #214f86; }
     .business-buyer { background: #2563eb !important; }
     .business-promo { background: #d97706 !important; }
     .business-merchant { background: #0f766e !important; }
@@ -871,10 +870,6 @@
       const baseScore = Number(item.score || 0) - (Number.isFinite(storedRelevance) ? storedRelevance : 0);
       return Math.max(1, Math.min(99, Math.round(baseScore + relevance.score)));
     }
-    function relevancePill(item) {
-      const relevance = buyerRelevanceOf(item);
-      return `<span class="relevance-pill" title="${escapeHtml(relevance.reason)}">${relevance.level}</span>`;
-    }
     function itemSources(item) {
       const sources = Array.isArray(item.sources) ? item.sources : [];
       const normalized = sources
@@ -1119,7 +1114,7 @@
             <div class="score">${candidateScore(item)}<small>买家侧</small></div>
           </div>
           <p class="summary">${item.summary}</p>
-          <div class="tags">${businessPill(item)}${relevancePill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
+          <div class="tags">${businessPill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
           <div class="source-row">
             ${sourceLinks(item)}
             <div class="candidate-actions">
@@ -1192,7 +1187,7 @@
               <div class="score">${candidateScore(item)}<small>买家侧</small></div>
             </div>
             <p class="summary">${item.summary || "暂无摘要"}</p>
-            <div class="tags">${businessPill(item)}${relevancePill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
+            <div class="tags">${businessPill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
             <div class="source-row">
               ${sourceLinks(item)}
               <div class="candidate-actions">
@@ -1247,7 +1242,7 @@
                 <button data-edit-item="${item.id}" type="button">编辑</button>
               </div>
             </div>
-            <div class="tags">${businessPill(item)}${relevancePill(item)}<span>${item.category}</span><span>${item.type}</span></div>
+            <div class="tags">${businessPill(item)}<span>${item.category}</span><span>${item.type}</span></div>
             ${itemEditPanel(item)}
             <p class="summary">${escapeHtml(item.summary)}</p>
             <p class="judge">${escapeHtml(item.judge)}</p>
