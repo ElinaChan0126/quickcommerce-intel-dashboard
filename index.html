@@ -594,9 +594,18 @@
       return tags;
     }
     function businessTagsOf(item) {
-      if (Array.isArray(item.businessTags) && item.businessTags.length) return item.businessTags;
-      if (item.businessTag) return [item.businessTag];
-      return inferBusinessTags(item);
+      const inferred = inferBusinessTags(item);
+      const saved = Array.isArray(item.businessTags) && item.businessTags.length
+        ? item.businessTags
+        : (item.businessTag ? [item.businessTag] : []);
+      const text = `${item.platform || ""} ${item.title || ""} ${item.type || ""} ${item.category || ""} ${item.summary || ""} ${item.judge || ""}`;
+      let tags = [...new Set([...saved, ...inferred])].filter(Boolean);
+      const buyerAiOrder = ["支付宝", "阿宝", "AI", "跑腿", "下单"].some(word => text.includes(word))
+        && ["用户", "下单", "卡片", "点餐", "代买", "帮取", "帮送"].some(word => text.includes(word));
+      const explicitPromo = ["活动", "补贴", "优惠", "满减", "大促", "世界杯", "看球", "冰冰节", "国补", "红包", "低至"].some(word => text.includes(word));
+      if (buyerAiOrder) tags = ["Buyer", ...tags.filter(tag => tag !== "Promo" && tag !== "Driver" && tag !== "S&R")];
+      if (tags.includes("Promo") && !explicitPromo) tags = tags.filter(tag => tag !== "Promo");
+      return [...new Set(tags)];
     }
     function businessClass(tag) {
       if (tag === "S&R") return "business-sr";
