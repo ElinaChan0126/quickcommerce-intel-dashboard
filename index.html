@@ -119,6 +119,13 @@
     .business-merchant { background: #0f766e !important; }
     .business-driver { background: #7c3aed !important; }
     .business-sr { background: #475569 !important; }
+    .tag-editor { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+    .tag-editor button {
+      min-height: 30px; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+      color: var(--muted); padding: 5px 9px; font-size: 12px; font-weight: 850;
+    }
+    .tag-editor button.is-active { border-color: transparent; color: #fff; }
+    .tag-editor button:focus-visible { outline: 3px solid rgba(15,143,124,.18); outline-offset: 2px; }
     .summary, .judge { margin: 12px 0 0; font-size: 14px; line-height: 1.72; }
     .judge { border-left: 3px solid var(--coral); padding-left: 12px; color: var(--muted); }
     .source-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 14px; }
@@ -549,6 +556,7 @@
     const storageKey = "quick-commerce-intel-custom-items";
     const ignoredCandidateKey = "quick-commerce-intel-ignored-candidates";
     const collapsedModulesKey = "quick-commerce-intel-collapsed-modules";
+    const tagOverrideKey = "quick-commerce-intel-business-tag-overrides";
     const els = {
       list: document.getElementById("list"),
       search: document.getElementById("search"),
@@ -568,6 +576,8 @@
     const setCustom = items => localStorage.setItem(storageKey, JSON.stringify(items));
     const getIgnored = () => JSON.parse(localStorage.getItem(ignoredCandidateKey) || "[]");
     const setIgnored = items => localStorage.setItem(ignoredCandidateKey, JSON.stringify(items));
+    const getTagOverrides = () => JSON.parse(localStorage.getItem(tagOverrideKey) || "{}");
+    const setTagOverrides = overrides => localStorage.setItem(tagOverrideKey, JSON.stringify(overrides));
     const allItems = () => [...baseIntel, ...getCustom()].sort((a, b) => b.date.localeCompare(a.date));
     const itemMonth = item => (item.date || "").slice(0, 7);
     const cleanBusinessText = text => String(text || "").replaceAll(placeholderSummary, "");
@@ -596,6 +606,10 @@
       return tags;
     }
     function businessTagsOf(item) {
+      const overrides = getTagOverrides();
+      if (item.id && Object.prototype.hasOwnProperty.call(overrides, item.id)) {
+        return (overrides[item.id] || []).filter(tag => businessTags.includes(tag));
+      }
       const inferred = inferBusinessTags(item);
       const saved = Array.isArray(item.businessTags) && item.businessTags.length
         ? item.businessTags
@@ -611,6 +625,12 @@
       if (buyerAiOrder || runnerSkillOrder) tags = ["Buyer"];
       if (tags.includes("Promo") && !explicitPromo) tags = tags.filter(tag => tag !== "Promo");
       return [...new Set(tags)];
+    }
+    function setBusinessTags(itemId, tags) {
+      if (!itemId) return;
+      const overrides = getTagOverrides();
+      overrides[itemId] = [...new Set(tags)].filter(tag => businessTags.includes(tag));
+      setTagOverrides(overrides);
     }
     function eventPlatform(item) {
       const text = `${item.platform || ""} ${item.title || ""} ${item.summary || ""}`;
@@ -642,17 +662,18 @@
         const key = eventKey(item);
         const nextSources = itemSources(item);
         if (!byEvent.has(key)) {
-          byEvent.set(key, {
+          const mergedItem = {
             ...item,
             id: eventIdFromKey(key),
             platform: eventPlatform(item),
             eventKey: key,
             candidateIds: [item.id],
             sources: nextSources,
-            sourceCount: nextSources.length || 1,
-            businessTags: businessTagsOf(item),
-            businessTag: businessTagsOf(item)[0] || ""
-          });
+            sourceCount: nextSources.length || 1
+          };
+          mergedItem.businessTags = businessTagsOf(mergedItem);
+          mergedItem.businessTag = mergedItem.businessTags[0] || "";
+          byEvent.set(key, mergedItem);
           return;
         }
         const existing = byEvent.get(key);
@@ -681,6 +702,13 @@
       const tags = businessTagsOf(item);
       if (!tags.length) return `<span>未标记</span>`;
       return tags.map(tag => `<span class="business-pill ${businessClass(tag)}">${tag}</span>`).join("");
+    }
+    function tagEditor(item) {
+      const selected = new Set(businessTagsOf(item));
+      return `<div class="tag-editor" aria-label="编辑业务标签">${businessTags.map(tag => {
+        const active = selected.has(tag);
+        return `<button class="${active ? `is-active ${businessClass(tag)}` : ""}" data-tag-item="${item.id}" data-tag-value="${tag}" type="button" aria-pressed="${active}">${tag}</button>`;
+      }).join("")}</div>`;
     }
     function itemSources(item) {
       const sources = Array.isArray(item.sources) ? item.sources : [];
@@ -747,6 +775,21 @@
         .filter(inSelectedMonth)
         .sort((a, b) => (b.score || 0) - (a.score || 0));
     }
+    function wireTagEditors(scope) {
+      scope.querySelectorAll("[data-tag-item]").forEach(button => {
+        button.addEventListener("click", () => {
+          const itemId = button.dataset.tagItem;
+          const tag = button.dataset.tagValue;
+          const currentItem = [...allItems(), ...candidatePool()].find(item => item.id === itemId);
+          const tags = new Set(currentItem ? businessTagsOf(currentItem) : []);
+          if (tags.has(tag)) tags.delete(tag);
+          else tags.add(tag);
+          setBusinessTags(itemId, [...tags]);
+          renderCandidates();
+          renderList();
+        });
+      });
+    }
     function renderCandidates() {
       const list = document.getElementById("candidate-list");
       const updated = document.getElementById("candidate-updated");
@@ -767,6 +810,7 @@
           </div>
           <p class="summary">${item.summary}</p>
           <div class="tags">${businessPill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
+          ${tagEditor(item)}
           <div class="source-row">
             ${sourceLinks(item)}
             <div class="candidate-actions">
@@ -810,6 +854,7 @@
           renderCandidates();
         });
       });
+      wireTagEditors(list);
     }
     function renderList() {
       const q = els.search.value.trim().toLowerCase();
@@ -838,6 +883,7 @@
               <span class="pill ${item.status === "待复核" ? "pending" : ""}">${item.status}</span>
             </div>
             <div class="tags">${businessPill(item)}<span>${item.category}</span><span>${item.type}</span></div>
+            ${tagEditor(item)}
             <p class="summary">${item.summary}</p>
             <p class="judge">${item.judge}</p>
             <div class="source-row">
@@ -854,6 +900,7 @@
           renderList();
         });
       });
+      wireTagEditors(els.list);
     }
     els.form.addEventListener("submit", event => {
       event.preventDefault();
