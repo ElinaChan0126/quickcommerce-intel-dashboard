@@ -599,6 +599,7 @@
       return inferBusinessTags(item);
     }
     function businessClass(tag) {
+      if (tag === "S&R") return "business-sr";
       return `business-${String(tag || "S&R").toLowerCase().replace("&", "r").replace(/[^a-z0-9]/g, "")}`;
     }
     function businessPill(item) {
