@@ -226,6 +226,19 @@
       <div class="candidate-list collapsible-content" id="candidate-list"></div>
     </section>
 
+    <section class="candidate-board module" aria-label="回收站" data-module="trash">
+      <div class="candidate-head">
+        <div>
+          <p class="label">回收站</p>
+          <h2>忽略的候选会在这里保留 30 天，可恢复或彻底删除</h2>
+        </div>
+        <div class="module-actions">
+          <div class="badge"><span>回收站条目</span><strong id="trash-count">0</strong></div>
+        </div>
+      </div>
+      <div class="candidate-list collapsible-content" id="trash-list"></div>
+    </section>
+
     <section class="workspace">
       <div class="board module" data-module="intel-list">
         <div class="board-head">
@@ -561,8 +574,10 @@
     // AUTO_CANDIDATES_END
     const storageKey = "quick-commerce-intel-custom-items";
     const ignoredCandidateKey = "quick-commerce-intel-ignored-candidates";
+    const purgedCandidateKey = "quick-commerce-intel-purged-candidates";
     const collapsedModulesKey = "quick-commerce-intel-collapsed-modules";
     const tagOverrideKey = "quick-commerce-intel-business-tag-overrides";
+    const trashRetentionDays = 30;
     const els = {
       list: document.getElementById("list"),
       search: document.getElementById("search"),
@@ -582,6 +597,8 @@
     const setCustom = items => localStorage.setItem(storageKey, JSON.stringify(items));
     const getIgnored = () => JSON.parse(localStorage.getItem(ignoredCandidateKey) || "[]");
     const setIgnored = items => localStorage.setItem(ignoredCandidateKey, JSON.stringify(items));
+    const getPurged = () => JSON.parse(localStorage.getItem(purgedCandidateKey) || "[]");
+    const setPurged = items => localStorage.setItem(purgedCandidateKey, JSON.stringify(items));
     const getTagOverrides = () => JSON.parse(localStorage.getItem(tagOverrideKey) || "{}");
     const setTagOverrides = overrides => localStorage.setItem(tagOverrideKey, JSON.stringify(overrides));
     const allItems = () => [...baseIntel, ...getCustom()].sort((a, b) => b.date.localeCompare(a.date));
@@ -589,6 +606,62 @@
     const cleanBusinessText = text => String(text || "").replaceAll(placeholderSummary, "");
     const currentMonth = () => selectedMonthFrom(els.month);
     const inSelectedMonth = item => currentMonth() === "全部月份" || itemMonth(item) === currentMonth();
+    function localDateISO(date = new Date()) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+    function dayStart(dateText) {
+      return new Date(`${dateText || localDateISO()}T00:00:00`).getTime();
+    }
+    function daysSince(dateText) {
+      return Math.max(0, Math.floor((dayStart(localDateISO()) - dayStart(dateText)) / 86400000));
+    }
+    function trashDaysLeft(record) {
+      return Math.max(0, trashRetentionDays - daysSince(record.deletedAt));
+    }
+    function itemCandidateIds(item) {
+      return [...new Set([item.id, ...((item && item.candidateIds) || [])].filter(Boolean))];
+    }
+    function addPurgedIds(ids) {
+      setPurged([...new Set([...getPurged(), ...ids.filter(Boolean)])]);
+    }
+    function normalizeTrashRecord(entry) {
+      if (typeof entry === "string") {
+        return { id: entry, candidateIds: [entry], deletedAt: localDateISO(), item: null };
+      }
+      const item = entry.item || null;
+      const id = entry.id || item?.id;
+      return {
+        id,
+        candidateIds: [...new Set([id, ...((entry.candidateIds || item?.candidateIds || []))].filter(Boolean))],
+        deletedAt: entry.deletedAt || localDateISO(),
+        item
+      };
+    }
+    function getTrash() {
+      const raw = getIgnored();
+      const normalized = raw.map(normalizeTrashRecord).filter(record => record.id);
+      const alive = [];
+      const expiredIds = [];
+      normalized.forEach(record => {
+        if (trashDaysLeft(record) > 0) alive.push(record);
+        else expiredIds.push(...record.candidateIds);
+      });
+      if (expiredIds.length) addPurgedIds(expiredIds);
+      if (alive.length !== raw.length || raw.some((entry, index) => typeof entry === "string" || entry.deletedAt !== alive[index]?.deletedAt)) {
+        setIgnored(alive);
+      }
+      return alive;
+    }
+    function setTrash(records) {
+      setIgnored(records.filter(record => trashDaysLeft(record) > 0));
+    }
+    function hiddenCandidateIds() {
+      const trashIds = getTrash().flatMap(record => record.candidateIds);
+      return new Set([...trashIds, ...getPurged()]);
+    }
     function unique(values, first) { return [first, ...Array.from(new Set(values))]; }
     function optionList(select, values) { select.innerHTML = values.map(v => `<option>${v}</option>`).join(""); }
     function monthLabel(month) {
@@ -767,12 +840,45 @@
     }
     function currentCandidates() {
       const existingUrls = new Set(allItems().flatMap(item => itemSources(item).map(source => source.url)));
-      const ignored = new Set(getIgnored());
+      const hiddenIds = hiddenCandidateIds();
       return candidatePool()
-        .filter(item => !ignored.has(item.id) && !(item.candidateIds || []).some(id => ignored.has(id)))
+        .filter(item => !hiddenIds.has(item.id) && !(item.candidateIds || []).some(id => hiddenIds.has(id)))
         .filter(item => !itemSources(item).some(source => existingUrls.has(source.url)))
         .filter(inSelectedMonth)
         .sort((a, b) => (b.score || 0) - (a.score || 0));
+    }
+    function itemFromTrashRecord(record) {
+      if (record.item) return record.item;
+      const ids = new Set(record.candidateIds || [record.id]);
+      return candidatePool().find(item => itemCandidateIds(item).some(id => ids.has(id))) || {
+        id: record.id,
+        title: "旧版忽略记录",
+        platform: "候选池",
+        date: record.deletedAt,
+        category: "候选",
+        summary: "这条记录来自旧版忽略列表，只保留了候选 ID。",
+        score: 0,
+        sources: []
+      };
+    }
+    function recycleCandidate(item) {
+      const ids = itemCandidateIds(item);
+      const next = getTrash().filter(record => !record.candidateIds.some(id => ids.includes(id)));
+      const snapshot = {
+        ...item,
+        sources: itemSources(item),
+        businessTags: businessTagsOf(item),
+        businessTag: businessTagsOf(item)[0] || ""
+      };
+      setTrash([{ id: item.id, candidateIds: ids, deletedAt: localDateISO(), item: snapshot }, ...next]);
+    }
+    function removeTrashRecord(recordId) {
+      setTrash(getTrash().filter(record => record.id !== recordId));
+    }
+    function purgeTrashRecord(recordId) {
+      const record = getTrash().find(item => item.id === recordId);
+      if (record) addPurgedIds(record.candidateIds);
+      removeTrashRecord(recordId);
     }
     function renderTagMenu(anchor, item) {
       const existing = document.getElementById("tag-menu");
@@ -800,6 +906,7 @@
           setBusinessTags(item.id, [...tags]);
           menu.remove();
           renderCandidates();
+          renderTrash();
           renderList();
         });
       });
@@ -809,7 +916,8 @@
         button.addEventListener("click", event => {
           event.stopPropagation();
           const itemId = button.dataset.tagMenuFor;
-          const item = [...allItems(), ...candidatePool()].find(candidate => candidate.id === itemId);
+          const trashItems = getTrash().map(itemFromTrashRecord);
+          const item = [...allItems(), ...candidatePool(), ...trashItems].find(candidate => candidate.id === itemId);
           if (item) renderTagMenu(button, item);
         });
       });
@@ -868,17 +976,67 @@
             priority: item.score >= 80 ? "高" : "中"
           };
           setCustom([saved, ...getCustom()]);
-          setIgnored([...new Set([...getIgnored(), item.id, ...(item.candidateIds || [])])]);
+          addPurgedIds(itemCandidateIds(item));
           renderFilters();
           renderCandidates();
+          renderTrash();
           renderList();
         });
       });
       list.querySelectorAll("[data-ignore]").forEach(button => {
         button.addEventListener("click", () => {
           const item = candidatePool().find(candidate => candidate.id === button.dataset.ignore);
-          setIgnored([...new Set([...getIgnored(), button.dataset.ignore, ...((item && item.candidateIds) || [])])]);
+          if (item) recycleCandidate(item);
           renderCandidates();
+          renderTrash();
+        });
+      });
+      wireTagEditors(list);
+    }
+    function renderTrash() {
+      const list = document.getElementById("trash-list");
+      const count = document.getElementById("trash-count");
+      const records = getTrash();
+      count.textContent = records.length;
+      if (!records.length) {
+        list.innerHTML = `<div class="candidate-empty">回收站是空的。候选池里点击“忽略”的线索会在这里保留 ${trashRetentionDays} 天。</div>`;
+        return;
+      }
+      list.innerHTML = records.map(record => {
+        const item = itemFromTrashRecord(record);
+        const left = trashDaysLeft(record);
+        return `
+          <article class="candidate-card">
+            <div class="candidate-top">
+              <div>
+                <p class="platform">${item.platform || "候选池"} · 删除于 ${record.deletedAt} · 剩余 ${left} 天</p>
+                <h3>${item.title}</h3>
+              </div>
+              <div class="score">${item.score || 0}</div>
+            </div>
+            <p class="summary">${item.summary || "暂无摘要"}</p>
+            <div class="tags">${businessPill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
+            <div class="source-row">
+              ${sourceLinks(item)}
+              <div class="candidate-actions">
+                <button data-restore="${record.id}" type="button">恢复</button>
+                <button data-purge="${record.id}" type="button">彻底删除</button>
+              </div>
+            </div>
+          </article>`;
+      }).join("");
+      list.querySelectorAll("[data-restore]").forEach(button => {
+        button.addEventListener("click", () => {
+          removeTrashRecord(button.dataset.restore);
+          renderCandidates();
+          renderTrash();
+        });
+      });
+      list.querySelectorAll("[data-purge]").forEach(button => {
+        button.addEventListener("click", () => {
+          purgeTrashRecord(button.dataset.purge);
+          renderCandidates();
+          renderTrash();
         });
       });
       wireTagEditors(list);
@@ -1024,6 +1182,7 @@
     renderFilters();
     initCollapsibleModules();
     renderCandidates();
+    renderTrash();
     renderList();
   </script>
 </body>
