@@ -241,7 +241,7 @@
             <label>日期<input id="date" type="date" value="2026-07-08" /></label>
             <label>平台<input id="new-platform" placeholder="例如 顺丰同城" /></label>
             <label>标题<input id="title" placeholder="一句话概括动作" /></label>
-            <label>业务标签<select id="new-business"></select></label>
+            <label>业务标签<select id="new-business" multiple size="5"></select></label>
             <label>类型<select id="new-category"></select></label>
             <label>摘要<textarea id="summary" placeholder="记录功能、活动、入口、权益或影响范围"></textarea></label>
             <label>来源链接<input id="source" placeholder="https://" /></label>
@@ -578,26 +578,31 @@
       const [year, value] = month.split("-");
       return `${year}年${Number(value)}月`;
     }
-    function inferBusinessTag(item) {
+    function inferBusinessTags(item) {
       const text = `${item.platform || ""} ${item.title || ""} ${item.type || ""} ${item.category || ""} ${item.summary || ""} ${item.judge || ""}`;
       const rules = [
-        ["Merchant", ["商家", "商户", "服务商", "经营", "店铺", "店装", "代运营", "培训", "课堂", "智能硬件", "闪电仓", "前置仓", "餐饮系统", "商家中心"]],
-        ["Driver", ["骑手", "骑士", "众包", "运力", "履约", "配送", "直送", "超时", "免罚", "蜂鸟", "达达秒送骑士", "城市骑士"]],
+        ["Buyer", ["用户", "消费者", "下单", "入口", "App", "APP", "小程序", "支付宝", "阿宝", "AI助手", "智能下单", "自然语言", "语音", "体验", "卡片", "订单预览", "频道", "会场", "点餐", "购物", "套餐"]],
         ["Promo", ["活动", "补贴", "优惠", "套餐", "满减", "大促", "618", "世界杯", "看球", "冰冰节", "国补", "低至", "红包"]],
-        ["Buyer", ["用户", "消费者", "下单", "入口", "App", "APP", "小程序", "支付宝", "阿宝", "AI助手", "智能下单", "自然语言", "语音", "体验"]],
+        ["Merchant", ["商家", "商户", "服务商", "经营", "店铺", "店装", "代运营", "培训", "课堂", "智能硬件", "闪电仓", "前置仓", "餐饮系统", "商家中心", "小程序私域"]],
+        ["Driver", ["骑手", "骑士", "众包", "运力", "超时", "免罚", "骑手权益", "骑士权益", "蜂鸟众包", "美团众包", "达达秒送骑士", "城市骑士"]],
         ["S&R", ["战略", "研报", "研究", "投研", "财报", "监管", "治理", "政策", "规则", "竞争", "格局", "目标", "计划"]]
       ];
-      return rules.find(([, words]) => words.some(word => text.includes(word)))?.[0] || "S&R";
+      const driverExclude = ["用户", "消费者", "下单", "入口", "支付宝", "阿宝", "AI助手", "智能下单", "自然语言", "语音", "小程序"];
+      const tags = rules
+        .filter(([tag, words]) => words.some(word => text.includes(word)) && !(tag === "Driver" && driverExclude.some(word => text.includes(word))))
+        .map(([tag]) => tag);
+      return tags.length ? tags : ["S&R"];
     }
-    function businessTagOf(item) {
-      return item.businessTag || inferBusinessTag(item);
+    function businessTagsOf(item) {
+      if (Array.isArray(item.businessTags) && item.businessTags.length) return item.businessTags;
+      if (item.businessTag) return [item.businessTag];
+      return inferBusinessTags(item);
     }
     function businessClass(tag) {
       return `business-${String(tag || "S&R").toLowerCase().replace("&", "r").replace(/[^a-z0-9]/g, "")}`;
     }
     function businessPill(item) {
-      const tag = businessTagOf(item);
-      return `<span class="business-pill ${businessClass(tag)}">${tag}</span>`;
+      return businessTagsOf(item).map(tag => `<span class="business-pill ${businessClass(tag)}">${tag}</span>`).join("");
     }
     function itemSources(item) {
       const sources = Array.isArray(item.sources) ? item.sources : [];
@@ -703,7 +708,8 @@
             title: item.title,
             type: item.type || "自动候选",
             category: item.category || "待归类",
-            businessTag: businessTagOf(item),
+            businessTag: businessTagsOf(item)[0],
+            businessTags: businessTagsOf(item),
             summary: item.summary,
             judge: item.judge || "自动抓取候选，已确认入库，建议在日报会上补充业务影响判断。",
             sourceName: item.sourceName || "自动抓取",
@@ -735,9 +741,10 @@
       const items = allItems();
       renderMetrics(items);
       const filtered = items.filter(item => {
-        const text = `${item.platform} ${businessTagOf(item)} ${item.title} ${item.summary} ${item.judge}`.toLowerCase();
+        const tags = businessTagsOf(item);
+        const text = `${item.platform} ${tags.join(" ")} ${item.title} ${item.summary} ${item.judge}`.toLowerCase();
         return (platform === "全部平台" || item.platform === platform)
-          && (business === "全部标签" || businessTagOf(item) === business)
+          && (business === "全部标签" || tags.includes(business))
           && (category === "全部类型" || item.category === category)
           && (status === "全部状态" || item.status === status)
           && inSelectedMonth(item)
@@ -777,7 +784,8 @@
         platform: document.getElementById("new-platform").value.trim(),
         title: document.getElementById("title").value.trim(),
         type: "手动录入",
-        businessTag: els.newBusiness.value,
+        businessTags: [...els.newBusiness.selectedOptions].map(option => option.value),
+        businessTag: ([...els.newBusiness.selectedOptions][0]?.value || "S&R"),
         category: els.newCategory.value,
         summary: document.getElementById("summary").value.trim(),
         judge: "待产品经理补充判断，可在日报会上确认影响级别。",

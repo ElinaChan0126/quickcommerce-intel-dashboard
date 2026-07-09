@@ -329,12 +329,14 @@ CATEGORY_RULES = [
 ]
 
 BUSINESS_TAG_RULES = [
-    ("Merchant", ["商家", "商户", "服务商", "经营", "店铺", "店装", "代运营", "培训", "课堂", "智能硬件", "闪电仓", "前置仓", "餐饮系统", "商家中心"]),
-    ("Driver", ["骑手", "骑士", "众包", "运力", "履约", "配送", "直送", "超时", "免罚", "蜂鸟", "达达秒送骑士", "城市骑士"]),
+    ("Buyer", ["用户", "消费者", "下单", "入口", "App", "APP", "小程序", "支付宝", "阿宝", "AI助手", "智能下单", "自然语言", "语音", "体验", "卡片", "订单预览", "频道", "会场", "点餐", "购物", "套餐"]),
     ("Promo", ["活动", "补贴", "优惠", "套餐", "满减", "大促", "618", "世界杯", "看球", "冰冰节", "国补", "低至", "红包"]),
-    ("Buyer", ["用户", "消费者", "下单", "入口", "App", "APP", "小程序", "支付宝", "阿宝", "AI助手", "智能下单", "自然语言", "语音", "体验"]),
+    ("Merchant", ["商家", "商户", "服务商", "经营", "店铺", "店装", "代运营", "培训", "课堂", "智能硬件", "闪电仓", "前置仓", "餐饮系统", "商家中心", "小程序私域"]),
+    ("Driver", ["骑手", "骑士", "众包", "运力", "超时", "免罚", "骑手权益", "骑士权益", "蜂鸟众包", "美团众包", "达达秒送骑士", "城市骑士"]),
     ("S&R", ["战略", "研报", "研究", "投研", "财报", "监管", "治理", "政策", "规则", "竞争", "格局", "目标", "计划"]),
 ]
+
+DRIVER_EXCLUDE_TERMS = ["用户", "消费者", "下单", "入口", "支付宝", "阿宝", "AI助手", "智能下单", "自然语言", "语音", "小程序"]
 
 EVENT_KEY_TERMS = [
     "支付宝",
@@ -459,11 +461,18 @@ def category_from_text(text: str) -> str:
     return "待归类"
 
 
-def business_tag_from_text(text: str) -> str:
+def business_tags_from_text(text: str) -> list[str]:
+    tags = []
     for tag, words in BUSINESS_TAG_RULES:
         if any(word in text for word in words):
-            return tag
-    return "S&R"
+            if tag == "Driver" and any(word in text for word in DRIVER_EXCLUDE_TERMS):
+                continue
+            tags.append(tag)
+    return tags or ["S&R"]
+
+
+def business_tag_from_text(text: str) -> str:
+    return business_tags_from_text(text)[0]
 
 
 def score_candidate(title: str, summary: str, url: str) -> int:
@@ -563,7 +572,7 @@ def normalized_event_key(candidate: dict) -> str:
         base = re.sub(r"[\W_]+", "", text.lower())[:28]
     return "|".join([
         candidate.get("platform") or "待识别平台",
-        candidate.get("businessTag") or "S&R",
+        ",".join(candidate.get("businessTags") or [candidate.get("businessTag") or "S&R"]),
         candidate.get("category") or "待归类",
         base,
     ])
@@ -612,6 +621,7 @@ def make_candidate(title: str, description: str, link: str, pub_date: str = "") 
         "type": "自动候选",
         "category": category_from_text(text),
         "businessTag": business_tag_from_text(text),
+        "businessTags": business_tags_from_text(text),
         "summary": description[:180] or "搜索结果未提供摘要，请打开来源复核。",
         "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
         "sourceName": sources[0]["name"],
