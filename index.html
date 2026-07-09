@@ -361,6 +361,7 @@
     const tagOverrideKey = "quick-commerce-intel-business-tag-overrides";
     const sourceWeightOverrideKey = "quick-commerce-intel-source-weight-overrides";
     const itemEditKey = "quick-commerce-intel-item-edits";
+    const removedIntelKey = "quick-commerce-intel-removed-items";
     const trashRetentionDays = 30;
     const els = {
       list: document.getElementById("list"),
@@ -397,8 +398,16 @@
     const setSourceWeightOverrides = overrides => localStorage.setItem(sourceWeightOverrideKey, JSON.stringify(overrides));
     const getItemEdits = () => JSON.parse(localStorage.getItem(itemEditKey) || "{}");
     const setItemEdits = edits => localStorage.setItem(itemEditKey, JSON.stringify(edits));
+    const getRemovedIntelIds = () => JSON.parse(localStorage.getItem(removedIntelKey) || "[]");
+    const setRemovedIntelIds = ids => localStorage.setItem(removedIntelKey, JSON.stringify([...new Set(ids)]));
     const applyItemEdits = item => ({ ...item, ...(getItemEdits()[item.id] || {}) });
-    const allItems = () => [...baseIntel, ...getCustom()].map(applyItemEdits).sort((a, b) => b.date.localeCompare(a.date));
+    const allItems = () => {
+      const removed = new Set(getRemovedIntelIds());
+      return [...baseIntel, ...getCustom()]
+        .filter(item => !removed.has(item.id))
+        .map(applyItemEdits)
+        .sort((a, b) => b.date.localeCompare(a.date));
+    };
     const itemMonth = item => (item.date || "").slice(0, 7);
     const escapeHtml = value => String(value || "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
     const cleanBusinessText = text => String(text || "").replaceAll(placeholderSummary, "");
@@ -509,6 +518,20 @@
       const overrides = getTagOverrides();
       overrides[itemId] = [...new Set(tags)].filter(tag => businessTags.includes(tag));
       setTagOverrides(overrides);
+    }
+    function removeIntelItem(itemId) {
+      const custom = getCustom();
+      if (custom.some(item => item.id === itemId)) {
+        setCustom(custom.filter(item => item.id !== itemId));
+      } else {
+        setRemovedIntelIds([...getRemovedIntelIds(), itemId]);
+      }
+      const tagOverrides = getTagOverrides();
+      delete tagOverrides[itemId];
+      setTagOverrides(tagOverrides);
+      const itemEdits = getItemEdits();
+      delete itemEdits[itemId];
+      setItemEdits(itemEdits);
     }
     function eventPlatform(item) {
       const text = `${item.platform || ""} ${item.title || ""} ${item.summary || ""}`;
@@ -1027,13 +1050,13 @@
             <p class="judge">${escapeHtml(item.judge)}</p>
             <div class="source-row">
               ${sourceLinks(item)}
-              ${item.id.startsWith("custom-") ? `<button data-remove="${item.id}" type="button">删除</button>` : ""}
+              <button data-remove="${item.id}" type="button">删除</button>
             </div>
           </div>
         </article>`).join("");
       els.list.querySelectorAll("[data-remove]").forEach(button => {
         button.addEventListener("click", () => {
-          setCustom(getCustom().filter(item => item.id !== button.dataset.remove));
+          removeIntelItem(button.dataset.remove);
           renderFilters();
           renderCandidates();
           renderList();
