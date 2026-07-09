@@ -242,6 +242,54 @@ def build_queries() -> list[str]:
 def source_inventory_count() -> int:
     return len(ALL_WEB_SOURCES) + len(ACCOUNT_TERMS) + len(PLATFORM_SEARCH_TERMS) + len(REPORT_SOURCES) + len(NEWS_SEARCH_CHANNELS)
 
+
+def source_weight_inventory() -> list[dict]:
+    rows = []
+    for source in ALL_WEB_SOURCES:
+        rows.append({
+            "name": source["name"],
+            "channel": "网页/官网",
+            "weight": source["weight"],
+            "basis": "域名命中加分",
+            "detail": f"{source['domain']} · {source['focus']}",
+        })
+    high_signal_accounts = set(HIGH_SIGNAL_ACCOUNTS)
+    for group, accounts in WECHAT_ACCOUNTS.items():
+        for account in accounts:
+            rows.append({
+                "name": account,
+                "channel": f"公众号 · {group}",
+                "weight": 9 if account in high_signal_accounts else 6,
+                "basis": "公众号名命中加分",
+                "detail": "重点来源" if account in high_signal_accounts else "常规来源",
+            })
+    for source in REPORT_SOURCES:
+        rows.append({
+            "name": source,
+            "channel": "券商/研报",
+            "weight": 4,
+            "basis": "报告来源命中加分",
+            "detail": "报告来源名称出现在标题或摘要时加分",
+        })
+    for term in PLATFORM_SEARCH_TERMS:
+        rows.append({
+            "name": term,
+            "channel": "平台/APP搜索",
+            "weight": 5,
+            "basis": "平台搜索词命中加分",
+            "detail": "用于补充小红书、骑手 APP 等非网页渠道线索",
+        })
+    for channel in NEWS_SEARCH_CHANNELS:
+        rows.append({
+            "name": channel,
+            "channel": "新闻搜索入口",
+            "weight": 0,
+            "basis": "搜索入口，不直接加分",
+            "detail": "用于扩展抓取范围，候选分数仍由来源和正文命中决定",
+        })
+    rows.sort(key=lambda item: (-item["weight"], item["channel"], item["name"]))
+    return rows
+
 PLATFORM_HINTS = [
     "淘宝闪购城市骑士",
     "淘宝闪购",
@@ -780,10 +828,16 @@ def collect_candidates() -> list[dict]:
 def inject_candidates(dashboard: Path, candidates: list[dict]) -> None:
     text = dashboard.read_text(encoding="utf-8")
     updated_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
+    meta = {
+        "updatedAt": updated_at,
+        "sourceCount": source_inventory_count(),
+        "queryCount": len(build_queries()),
+        "sourceWeights": source_weight_inventory(),
+    }
     block = (
         "    // AUTO_CANDIDATES_START\n"
         f"    const generatedCandidates = {json.dumps(candidates, ensure_ascii=False, indent=6)};\n"
-        f"    const generatedMeta = {json.dumps({'updatedAt': updated_at, 'sourceCount': source_inventory_count(), 'queryCount': len(build_queries())}, ensure_ascii=False)};\n"
+        f"    const generatedMeta = {json.dumps(meta, ensure_ascii=False)};\n"
         "    // AUTO_CANDIDATES_END"
     )
     pattern = re.compile(
