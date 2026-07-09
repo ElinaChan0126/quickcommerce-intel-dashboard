@@ -112,20 +112,26 @@
     .pill { flex: 0 0 auto; border-radius: 999px; background: #e3ebf7; color: #214f86; padding: 7px 10px; font-size: 12px; font-weight: 850; }
     .pill.pending { background: #f7ecd2; color: #835806; }
     .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-    .tags span { border: 1px solid var(--line); border-radius: 999px; background: var(--soft); color: #3b433a; padding: 6px 9px; font-size: 12px; font-weight: 750; }
+    .tags span, .tags button { border: 1px solid var(--line); border-radius: 999px; background: var(--soft); color: #3b433a; padding: 6px 9px; font-size: 12px; font-weight: 750; }
+    .tags button { cursor: pointer; }
     .tags .business-pill { border-color: transparent; color: #fff; }
+    .tags .business-empty { background: #fff; border-style: dashed; color: var(--muted); }
     .business-buyer { background: #2563eb !important; }
     .business-promo { background: #d97706 !important; }
     .business-merchant { background: #0f766e !important; }
     .business-driver { background: #7c3aed !important; }
     .business-sr { background: #475569 !important; }
-    .tag-editor { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
-    .tag-editor button {
-      min-height: 30px; border: 1px solid var(--line); border-radius: 999px; background: #fff;
-      color: var(--muted); padding: 5px 9px; font-size: 12px; font-weight: 850;
+    .tag-menu {
+      position: fixed; z-index: 20; display: grid; grid-template-columns: repeat(2, max-content); gap: 8px;
+      border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: var(--shadow); padding: 10px;
     }
-    .tag-editor button.is-active { border-color: transparent; color: #fff; }
-    .tag-editor button:focus-visible { outline: 3px solid rgba(15,143,124,.18); outline-offset: 2px; }
+    .tag-menu[hidden] { display: none; }
+    .tag-menu button {
+      min-height: 30px; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+      color: var(--muted); padding: 5px 10px; font-size: 12px; font-weight: 850;
+    }
+    .tag-menu button.is-active { border-color: transparent; color: #fff; }
+    .tags button:focus-visible, .tag-menu button:focus-visible { outline: 3px solid rgba(15,143,124,.18); outline-offset: 2px; }
     .summary, .judge { margin: 12px 0 0; font-size: 14px; line-height: 1.72; }
     .judge { border-left: 3px solid var(--coral); padding-left: 12px; color: var(--muted); }
     .source-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 14px; }
@@ -700,15 +706,8 @@
     }
     function businessPill(item) {
       const tags = businessTagsOf(item);
-      if (!tags.length) return `<span>未标记</span>`;
-      return tags.map(tag => `<span class="business-pill ${businessClass(tag)}">${tag}</span>`).join("");
-    }
-    function tagEditor(item) {
-      const selected = new Set(businessTagsOf(item));
-      return `<div class="tag-editor" aria-label="编辑业务标签">${businessTags.map(tag => {
-        const active = selected.has(tag);
-        return `<button class="${active ? `is-active ${businessClass(tag)}` : ""}" data-tag-item="${item.id}" data-tag-value="${tag}" type="button" aria-pressed="${active}">${tag}</button>`;
-      }).join("")}</div>`;
+      if (!tags.length) return `<button class="business-empty" data-tag-menu-for="${item.id}" type="button">未标记</button>`;
+      return tags.map(tag => `<button class="business-pill ${businessClass(tag)}" data-tag-menu-for="${item.id}" type="button">${tag}</button>`).join("");
     }
     function itemSources(item) {
       const sources = Array.isArray(item.sources) ? item.sources : [];
@@ -775,21 +774,50 @@
         .filter(inSelectedMonth)
         .sort((a, b) => (b.score || 0) - (a.score || 0));
     }
-    function wireTagEditors(scope) {
-      scope.querySelectorAll("[data-tag-item]").forEach(button => {
+    function renderTagMenu(anchor, item) {
+      const existing = document.getElementById("tag-menu");
+      if (existing) existing.remove();
+      const selected = new Set(businessTagsOf(item));
+      const menu = document.createElement("div");
+      menu.id = "tag-menu";
+      menu.className = "tag-menu";
+      menu.setAttribute("role", "menu");
+      menu.innerHTML = businessTags.map(tag => {
+        const active = selected.has(tag);
+        return `<button class="${active ? `is-active ${businessClass(tag)}` : ""}" data-tag-value="${tag}" type="button" aria-pressed="${active}">${tag}</button>`;
+      }).join("");
+      document.body.appendChild(menu);
+      const rect = anchor.getBoundingClientRect();
+      const left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 12);
+      menu.style.left = `${Math.max(12, left)}px`;
+      menu.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - menu.offsetHeight - 12)}px`;
+      menu.querySelectorAll("[data-tag-value]").forEach(button => {
         button.addEventListener("click", () => {
-          const itemId = button.dataset.tagItem;
           const tag = button.dataset.tagValue;
-          const currentItem = [...allItems(), ...candidatePool()].find(item => item.id === itemId);
-          const tags = new Set(currentItem ? businessTagsOf(currentItem) : []);
+          const tags = new Set(businessTagsOf(item));
           if (tags.has(tag)) tags.delete(tag);
           else tags.add(tag);
-          setBusinessTags(itemId, [...tags]);
+          setBusinessTags(item.id, [...tags]);
+          menu.remove();
           renderCandidates();
           renderList();
         });
       });
     }
+    function wireTagEditors(scope) {
+      scope.querySelectorAll("[data-tag-menu-for]").forEach(button => {
+        button.addEventListener("click", event => {
+          event.stopPropagation();
+          const itemId = button.dataset.tagMenuFor;
+          const item = [...allItems(), ...candidatePool()].find(candidate => candidate.id === itemId);
+          if (item) renderTagMenu(button, item);
+        });
+      });
+    }
+    document.addEventListener("click", event => {
+      const menu = document.getElementById("tag-menu");
+      if (menu && !menu.contains(event.target)) menu.remove();
+    });
     function renderCandidates() {
       const list = document.getElementById("candidate-list");
       const updated = document.getElementById("candidate-updated");
@@ -810,7 +838,6 @@
           </div>
           <p class="summary">${item.summary}</p>
           <div class="tags">${businessPill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
-          ${tagEditor(item)}
           <div class="source-row">
             ${sourceLinks(item)}
             <div class="candidate-actions">
@@ -883,7 +910,6 @@
               <span class="pill ${item.status === "待复核" ? "pending" : ""}">${item.status}</span>
             </div>
             <div class="tags">${businessPill(item)}<span>${item.category}</span><span>${item.type}</span></div>
-            ${tagEditor(item)}
             <p class="summary">${item.summary}</p>
             <p class="judge">${item.judge}</p>
             <div class="source-row">
