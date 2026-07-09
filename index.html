@@ -109,6 +109,7 @@
     .title-row { display: flex; justify-content: space-between; gap: 14px; align-items: start; }
     .platform { margin: 0 0 4px; color: var(--teal); font-size: 13px; font-weight: 850; }
     .title-row h3 { font-size: 19px; line-height: 1.35; }
+    .title-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
     .pill { flex: 0 0 auto; border-radius: 999px; background: #e3ebf7; color: #214f86; padding: 7px 10px; font-size: 12px; font-weight: 850; }
     .pill.pending { background: #f7ecd2; color: #835806; }
     .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -150,10 +151,22 @@
     .source em { color: var(--coral); font-size: 12px; font-style: normal; font-weight: 850; }
     .weight-tools { display: grid; grid-template-columns: 1fr 150px; gap: 8px; margin-top: 14px; }
     .weight-list { display: grid; gap: 8px; max-height: 420px; overflow: auto; padding-right: 2px; }
-    .weight-row { display: grid; grid-template-columns: minmax(0,1fr) 44px; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 10px 12px; }
+    .weight-row { display: grid; grid-template-columns: minmax(0,1fr) 82px; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 10px 12px; }
     .weight-row strong { display: block; min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
     .weight-row span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.45; }
-    .weight-score { height: 34px; display: grid; place-items: center; border-radius: 8px; background: #dff1ea; color: #095f51; font-size: 14px; font-weight: 900; }
+    .weight-edit { display: grid; gap: 6px; }
+    .weight-edit input { height: 34px; padding: 6px 8px; text-align: center; font-size: 14px; font-weight: 900; }
+    .weight-edit button { border: 0; background: transparent; color: var(--teal); font-size: 12px; font-weight: 850; }
+    .edit-row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .title-actions button, .edit-row-actions button, .inline-edit button {
+      border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); padding: 8px 10px; font-size: 13px; font-weight: 850;
+    }
+    .title-actions button { color: var(--teal); }
+    .edit-row-actions button { color: var(--teal); }
+    .inline-edit { display: grid; gap: 10px; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 12px; }
+    .inline-edit textarea { min-height: 76px; }
+    .inline-edit .edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .inline-edit .edit-actions button:first-child { border-color: var(--teal); background: var(--teal); color: #fff; }
     .runbook { margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.65; }
     .code-chip { display: inline-block; margin-top: 8px; border-radius: 8px; background: var(--soft); color: #3b433a; padding: 8px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
     @media (max-width: 1100px) {
@@ -588,6 +601,8 @@
     const purgedCandidateKey = "quick-commerce-intel-purged-candidates";
     const collapsedModulesKey = "quick-commerce-intel-collapsed-modules";
     const tagOverrideKey = "quick-commerce-intel-business-tag-overrides";
+    const sourceWeightOverrideKey = "quick-commerce-intel-source-weight-overrides";
+    const itemEditKey = "quick-commerce-intel-item-edits";
     const trashRetentionDays = 30;
     const els = {
       list: document.getElementById("list"),
@@ -615,11 +630,18 @@
     const setPurged = items => localStorage.setItem(purgedCandidateKey, JSON.stringify(items));
     const getTagOverrides = () => JSON.parse(localStorage.getItem(tagOverrideKey) || "{}");
     const setTagOverrides = overrides => localStorage.setItem(tagOverrideKey, JSON.stringify(overrides));
-    const allItems = () => [...baseIntel, ...getCustom()].sort((a, b) => b.date.localeCompare(a.date));
+    const getSourceWeightOverrides = () => JSON.parse(localStorage.getItem(sourceWeightOverrideKey) || "{}");
+    const setSourceWeightOverrides = overrides => localStorage.setItem(sourceWeightOverrideKey, JSON.stringify(overrides));
+    const getItemEdits = () => JSON.parse(localStorage.getItem(itemEditKey) || "{}");
+    const setItemEdits = edits => localStorage.setItem(itemEditKey, JSON.stringify(edits));
+    const applyItemEdits = item => ({ ...item, ...(getItemEdits()[item.id] || {}) });
+    const allItems = () => [...baseIntel, ...getCustom()].map(applyItemEdits).sort((a, b) => b.date.localeCompare(a.date));
     const itemMonth = item => (item.date || "").slice(0, 7);
+    const escapeHtml = value => String(value || "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
     const cleanBusinessText = text => String(text || "").replaceAll(placeholderSummary, "");
     const currentMonth = () => selectedMonthFrom(els.month);
     const inSelectedMonth = item => currentMonth() === "全部月份" || itemMonth(item) === currentMonth();
+    let editingItemId = "";
     function localDateISO(date = new Date()) {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -844,6 +866,36 @@
       optionList(els.newBusiness, businessTags);
       optionList(els.newCategory, unique(items.map(i => i.category), "AI入口").filter(v => v !== "全部类型"));
     }
+    function sourceWeightKey(row) {
+      return `${row.channel}|${row.name}`;
+    }
+    function sourceWeightOf(row) {
+      const overrides = getSourceWeightOverrides();
+      const value = overrides[sourceWeightKey(row)];
+      return Number.isFinite(Number(value)) ? Number(value) : Number(row.weight || 0);
+    }
+    function itemEditPanel(item) {
+      if (editingItemId !== item.id) return "";
+      return `
+        <div class="inline-edit" data-edit-panel="${item.id}">
+          <label><span>标题</span><input data-edit-title value="${escapeHtml(item.title)}" /></label>
+          <label><span>内容简介</span><textarea data-edit-summary>${escapeHtml(item.summary)}</textarea></label>
+          <div class="edit-actions">
+            <button data-edit-save="${item.id}" type="button">保存</button>
+            <button data-edit-cancel="${item.id}" type="button">取消</button>
+          </div>
+        </div>`;
+    }
+    function saveItemTextEdit(itemId, panel) {
+      const title = panel.querySelector("[data-edit-title]").value.trim();
+      const summary = panel.querySelector("[data-edit-summary]").value.trim();
+      if (!title || !summary) return;
+      const edits = getItemEdits();
+      edits[itemId] = { ...(edits[itemId] || {}), title, summary };
+      setItemEdits(edits);
+      editingItemId = "";
+      renderList();
+    }
     function renderSourceWeights() {
       const rows = Array.isArray(generatedMeta.sourceWeights) ? generatedMeta.sourceWeights : [];
       const channels = unique(rows.map(row => row.channel).filter(Boolean).sort(), "全部渠道");
@@ -852,10 +904,14 @@
       els.sourceWeightChannel.value = channels.includes(current) ? current : "全部渠道";
       const q = (els.sourceWeightSearch.value || "").trim().toLowerCase();
       const channel = els.sourceWeightChannel.value || "全部渠道";
-      const filtered = rows.filter(row => {
+      const filtered = rows.map(row => ({
+        ...row,
+        key: sourceWeightKey(row),
+        effectiveWeight: sourceWeightOf(row)
+      })).filter(row => {
         const text = `${row.name} ${row.channel} ${row.basis} ${row.detail}`.toLowerCase();
         return (channel === "全部渠道" || row.channel === channel) && text.includes(q);
-      });
+      }).sort((a, b) => (b.effectiveWeight - a.effectiveWeight) || a.channel.localeCompare(b.channel) || a.name.localeCompare(b.name));
       if (!filtered.length) {
         els.sourceWeightList.innerHTML = `<div class="candidate-empty">没有匹配的来源权重。</div>`;
         return;
@@ -863,13 +919,33 @@
       els.sourceWeightList.innerHTML = filtered.map(row => `
         <article class="weight-row">
           <div>
-            <strong>${row.name}</strong>
+            <strong>${escapeHtml(row.name)}</strong>
             <span>${row.channel} · ${row.basis}</span>
-            <span>${row.detail}</span>
+            <span>${escapeHtml(row.detail)}</span>
           </div>
-          <div class="weight-score">${row.weight}</div>
+          <div class="weight-edit">
+            <input data-source-weight="${escapeHtml(row.key)}" type="number" min="0" max="20" step="1" value="${row.effectiveWeight}" />
+            ${row.effectiveWeight !== row.weight ? `<button data-source-weight-reset="${escapeHtml(row.key)}" type="button">重置 ${row.weight}</button>` : ""}
+          </div>
         </article>
       `).join("");
+      els.sourceWeightList.querySelectorAll("[data-source-weight]").forEach(input => {
+        input.addEventListener("change", () => {
+          const value = Math.max(0, Math.min(20, Number(input.value || 0)));
+          const overrides = getSourceWeightOverrides();
+          overrides[input.dataset.sourceWeight] = value;
+          setSourceWeightOverrides(overrides);
+          renderSourceWeights();
+        });
+      });
+      els.sourceWeightList.querySelectorAll("[data-source-weight-reset]").forEach(button => {
+        button.addEventListener("click", () => {
+          const overrides = getSourceWeightOverrides();
+          delete overrides[button.dataset.sourceWeightReset];
+          setSourceWeightOverrides(overrides);
+          renderSourceWeights();
+        });
+      });
     }
     function renderMetrics(items) {
       const scoped = items.filter(inSelectedMonth);
@@ -1105,12 +1181,16 @@
           <div class="date"><span>${item.date.slice(5)}</span><strong>${item.priority}</strong></div>
           <div>
             <div class="title-row">
-              <div><p class="platform">${item.platform}</p><h3>${item.title}</h3></div>
-              <span class="pill ${item.status === "待复核" ? "pending" : ""}">${item.status}</span>
+              <div><p class="platform">${escapeHtml(item.platform)}</p><h3>${escapeHtml(item.title)}</h3></div>
+              <div class="title-actions">
+                <span class="pill ${item.status === "待复核" ? "pending" : ""}">${item.status}</span>
+                <button data-edit-item="${item.id}" type="button">编辑</button>
+              </div>
             </div>
             <div class="tags">${businessPill(item)}<span>${item.category}</span><span>${item.type}</span></div>
-            <p class="summary">${item.summary}</p>
-            <p class="judge">${item.judge}</p>
+            ${itemEditPanel(item)}
+            <p class="summary">${escapeHtml(item.summary)}</p>
+            <p class="judge">${escapeHtml(item.judge)}</p>
             <div class="source-row">
               ${sourceLinks(item)}
               ${item.id.startsWith("custom-") ? `<button data-remove="${item.id}" type="button">删除</button>` : ""}
@@ -1122,6 +1202,24 @@
           setCustom(getCustom().filter(item => item.id !== button.dataset.remove));
           renderFilters();
           renderCandidates();
+          renderList();
+        });
+      });
+      els.list.querySelectorAll("[data-edit-item]").forEach(button => {
+        button.addEventListener("click", () => {
+          editingItemId = editingItemId === button.dataset.editItem ? "" : button.dataset.editItem;
+          renderList();
+        });
+      });
+      els.list.querySelectorAll("[data-edit-save]").forEach(button => {
+        button.addEventListener("click", () => {
+          const panel = button.closest("[data-edit-panel]");
+          if (panel) saveItemTextEdit(button.dataset.editSave, panel);
+        });
+      });
+      els.list.querySelectorAll("[data-edit-cancel]").forEach(button => {
+        button.addEventListener("click", () => {
+          editingItemId = "";
           renderList();
         });
       });
