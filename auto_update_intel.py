@@ -333,7 +333,7 @@ BUSINESS_TAG_RULES = [
     ("Promo", ["活动", "补贴", "优惠", "套餐", "满减", "大促", "618", "世界杯", "看球", "冰冰节", "国补", "低至", "红包"]),
     ("Merchant", ["商家", "商户", "服务商", "经营", "店铺", "店装", "代运营", "培训", "课堂", "智能硬件", "闪电仓", "前置仓", "餐饮系统", "商家中心", "小程序私域"]),
     ("Driver", ["骑手", "骑士", "众包", "运力", "超时", "免罚", "骑手权益", "骑士权益", "蜂鸟众包", "美团众包", "达达秒送骑士", "城市骑士"]),
-    ("S&R", ["战略", "研报", "研究", "投研", "财报", "监管", "治理", "政策", "规则", "竞争", "格局", "目标", "计划"]),
+    ("S&R", ["搜索", "推荐", "搜推", "搜广推", "广告", "投放", "流量", "排序", "召回", "个性化", "推荐位", "搜索框", "搜索结果", "搜索词", "关键词", "会场推荐"]),
 ]
 
 DRIVER_EXCLUDE_TERMS = ["用户", "消费者", "下单", "入口", "支付宝", "阿宝", "AI助手", "智能下单", "自然语言", "语音", "小程序"]
@@ -468,11 +468,12 @@ def business_tags_from_text(text: str) -> list[str]:
             if tag == "Driver" and any(word in text for word in DRIVER_EXCLUDE_TERMS):
                 continue
             tags.append(tag)
-    return tags or ["S&R"]
+    return tags
 
 
 def business_tag_from_text(text: str) -> str:
-    return business_tags_from_text(text)[0]
+    tags = business_tags_from_text(text)
+    return tags[0] if tags else ""
 
 
 def score_candidate(title: str, summary: str, url: str) -> int:
@@ -572,7 +573,7 @@ def normalized_event_key(candidate: dict) -> str:
         base = re.sub(r"[\W_]+", "", text.lower())[:28]
     return "|".join([
         candidate.get("platform") or "待识别平台",
-        ",".join(candidate.get("businessTags") or [candidate.get("businessTag") or "S&R"]),
+        ",".join(candidate.get("businessTags") or [candidate.get("businessTag") or "未标记"]),
         candidate.get("category") or "待归类",
         base,
     ])

@@ -585,13 +585,13 @@
         ["Promo", ["活动", "补贴", "优惠", "套餐", "满减", "大促", "618", "世界杯", "看球", "冰冰节", "国补", "低至", "红包"]],
         ["Merchant", ["商家", "商户", "服务商", "经营", "店铺", "店装", "代运营", "培训", "课堂", "智能硬件", "闪电仓", "前置仓", "餐饮系统", "商家中心", "小程序私域"]],
         ["Driver", ["骑手", "骑士", "众包", "运力", "超时", "免罚", "骑手权益", "骑士权益", "蜂鸟众包", "美团众包", "达达秒送骑士", "城市骑士"]],
-        ["S&R", ["战略", "研报", "研究", "投研", "财报", "监管", "治理", "政策", "规则", "竞争", "格局", "目标", "计划"]]
+        ["S&R", ["搜索", "推荐", "搜推", "搜广推", "广告", "投放", "流量", "排序", "召回", "个性化", "推荐位", "搜索框", "搜索结果", "搜索词", "关键词", "会场推荐"]]
       ];
       const driverExclude = ["用户", "消费者", "下单", "入口", "支付宝", "阿宝", "AI助手", "智能下单", "自然语言", "语音", "小程序"];
       const tags = rules
         .filter(([tag, words]) => words.some(word => text.includes(word)) && !(tag === "Driver" && driverExclude.some(word => text.includes(word))))
         .map(([tag]) => tag);
-      return tags.length ? tags : ["S&R"];
+      return tags;
     }
     function businessTagsOf(item) {
       if (Array.isArray(item.businessTags) && item.businessTags.length) return item.businessTags;
@@ -603,7 +603,9 @@
       return `business-${String(tag || "S&R").toLowerCase().replace("&", "r").replace(/[^a-z0-9]/g, "")}`;
     }
     function businessPill(item) {
-      return businessTagsOf(item).map(tag => `<span class="business-pill ${businessClass(tag)}">${tag}</span>`).join("");
+      const tags = businessTagsOf(item);
+      if (!tags.length) return `<span>未标记</span>`;
+      return tags.map(tag => `<span class="business-pill ${businessClass(tag)}">${tag}</span>`).join("");
     }
     function itemSources(item) {
       const sources = Array.isArray(item.sources) ? item.sources : [];
@@ -709,7 +711,7 @@
             title: item.title,
             type: item.type || "自动候选",
             category: item.category || "待归类",
-            businessTag: businessTagsOf(item)[0],
+            businessTag: businessTagsOf(item)[0] || "",
             businessTags: businessTagsOf(item),
             summary: item.summary,
             judge: item.judge || "自动抓取候选，已确认入库，建议在日报会上补充业务影响判断。",
@@ -786,7 +788,7 @@
         title: document.getElementById("title").value.trim(),
         type: "手动录入",
         businessTags: [...els.newBusiness.selectedOptions].map(option => option.value),
-        businessTag: ([...els.newBusiness.selectedOptions][0]?.value || "S&R"),
+        businessTag: ([...els.newBusiness.selectedOptions][0]?.value || ""),
         category: els.newCategory.value,
         summary: document.getElementById("summary").value.trim(),
         judge: "待产品经理补充判断，可在日报会上确认影响级别。",
