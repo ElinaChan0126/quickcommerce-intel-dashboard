@@ -246,13 +246,13 @@
             <div><p class="label">采集队列</p><h2>每日固定来源</h2></div>
           </div>
           <div class="sources collapsible-content">
-            <div class="source"><strong>36氪</strong><span>融资、快讯、平台战略</span><em>每日 09:30 / 17:30</em></div>
-            <div class="source"><strong>虎嗅</strong><span>评论、监管、竞争格局</span><em>每日 10:00</em></div>
-            <div class="source"><strong>技术团队公众号</strong><span>AI、履约、工程能力</span><em>每周二/四</em></div>
-            <div class="source"><strong>平台官方与地方媒体</strong><span>新功能、活动、政策协同</span><em>每日滚动</em></div>
-            <div class="source"><strong>公众号检索</strong><span>活动口径、商家端工具、服务商生态</span><em>每日 18:00</em></div>
-            <p class="runbook">本地自动抓取脚本会搜索这些来源，提取候选线索并写回本页面。公众号结果只进入候选池，不直接入库。</p>
-            <span class="code-chip">python3 outputs/auto_update_intel.py</span>
+            <div class="source"><strong>行业媒体</strong><span>36氪、虎嗅、钛媒体、亿欧、亿邦动力、联商网、网经社</span><em>战略 / 供给 / 零售</em></div>
+            <div class="source"><strong>科技媒体</strong><span>IT之家、TechWeb、DoNews、雷峰网</span><em>AI / 技术 / 新入口</em></div>
+            <div class="source"><strong>财经媒体</strong><span>界面、第一财经、21财经、每日经济新闻、证券时报、财联社</span><em>公司 / 资本 / 产业</em></div>
+            <div class="source"><strong>综合与地方媒体</strong><span>新浪财经、中国经济网、中新网、新华网、人民网、央视网、澎湃、新京报、京报网、同花顺、东方财富、上观、观察者网等</span><em>政策 / 活动 / 民生</em></div>
+            <div class="source"><strong>技术、公众号与官方</strong><span>淘宝技术、美团技术团队、公众号索引、美团、顺丰同城、闪送、UU跑腿、达达、京东到家、饿了么官网</span><em>技术能力 / 官方口径</em></div>
+            <p class="runbook">自动抓取脚本会按月份组合平台词、行业词和 44 个固定数据源，其中 14 个高信号来源会做主动站内搜索。公众号结果只进入候选池，不直接入库。</p>
+            <span class="code-chip">python auto_update_intel.py --dashboard index.html</span>
           </div>
         </section>
       </aside>
@@ -533,7 +533,7 @@
             "score": 76
       }
 ];
-    const generatedMeta = {"updatedAt": "2026-07-08 21:07", "sourceCount": 42};
+    const generatedMeta = {"updatedAt": "2026-07-08 21:07", "sourceCount": 44, "queryCount": 58};
     // AUTO_CANDIDATES_END
     const storageKey = "quick-commerce-intel-custom-items";
     const ignoredCandidateKey = "quick-commerce-intel-ignored-candidates";

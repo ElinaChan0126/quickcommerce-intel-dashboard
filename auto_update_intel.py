@@ -19,9 +19,61 @@ from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
 
-DASHBOARD = Path(__file__).with_name("competitor-intel-dashboard.html")
+DEFAULT_DASHBOARD = Path(__file__).with_name("index.html")
+FALLBACK_DASHBOARD = Path(__file__).with_name("competitor-intel-dashboard.html")
+DASHBOARD = DEFAULT_DASHBOARD if DEFAULT_DASHBOARD.exists() else FALLBACK_DASHBOARD
 CN_TZ = timezone(timedelta(hours=8))
 RECENT_DAYS = 45
+
+DATA_SOURCES = [
+    {"name": "36氪", "domain": "36kr.com", "focus": "即时零售、平台战略、融资快讯", "weight": 10},
+    {"name": "虎嗅", "domain": "huxiu.com", "focus": "行业评论、竞争格局、监管观察", "weight": 8},
+    {"name": "钛媒体", "domain": "tmtpost.com", "focus": "科技商业、平台战略", "weight": 7},
+    {"name": "亿欧", "domain": "iyiou.com", "focus": "零售、电商、本地生活", "weight": 7},
+    {"name": "亿邦动力", "domain": "ebrun.com", "focus": "电商、即时零售、商家生态", "weight": 9},
+    {"name": "联商网", "domain": "linkshop.com", "focus": "零售业态、商超便利、门店供给", "weight": 8},
+    {"name": "网经社", "domain": "100ec.cn", "focus": "电商、平台经济、监管动态", "weight": 7},
+    {"name": "IT之家", "domain": "ithome.com", "focus": "AI、入口产品、新功能发布", "weight": 8},
+    {"name": "TechWeb", "domain": "techweb.com.cn", "focus": "互联网公司动态、产品发布", "weight": 8},
+    {"name": "DoNews", "domain": "donews.com", "focus": "互联网、AI、平台动态", "weight": 6},
+    {"name": "雷峰网", "domain": "leiphone.com", "focus": "AI 技术、智能体、技术生态", "weight": 6},
+    {"name": "界面新闻", "domain": "jiemian.com", "focus": "消费、零售、公司新闻", "weight": 7},
+    {"name": "第一财经", "domain": "yicai.com", "focus": "商业公司、消费零售、宏观行业", "weight": 7},
+    {"name": "21世纪经济报道", "domain": "21jingji.com", "focus": "公司经营、产业政策、消费市场", "weight": 7},
+    {"name": "每日经济新闻", "domain": "nbd.com.cn", "focus": "上市公司、消费产业、平台竞争", "weight": 6},
+    {"name": "证券时报", "domain": "stcn.com", "focus": "上市公司公告、资本市场动向", "weight": 6},
+    {"name": "财联社", "domain": "cls.cn", "focus": "公司快讯、资本市场、行业事件", "weight": 6},
+    {"name": "新浪财经", "domain": "finance.sina.cn", "focus": "转载媒体、公司动态、行业快讯", "weight": 7},
+    {"name": "中国经济网", "domain": "finance.ce.cn", "focus": "消费产业、平台活动、公司动态", "weight": 7},
+    {"name": "中国新闻网", "domain": "chinanews.com.cn", "focus": "企业动态、地方消费、政策协同", "weight": 6},
+    {"name": "新华网", "domain": "xinhuanet.com", "focus": "政策、民生、平台治理", "weight": 6},
+    {"name": "人民网", "domain": "people.com.cn", "focus": "政策、监管、劳动权益", "weight": 6},
+    {"name": "央视网", "domain": "cctv.com", "focus": "监管、民生消费、行业报道", "weight": 6},
+    {"name": "澎湃新闻", "domain": "thepaper.cn", "focus": "公司动态、社会治理、劳动权益", "weight": 6},
+    {"name": "新京报", "domain": "bjnews.com.cn", "focus": "消费、即时零售、民生服务", "weight": 6},
+    {"name": "京报网", "domain": "news.bjd.com.cn", "focus": "本地服务、AI 入口、平台合作", "weight": 7},
+    {"name": "同花顺财经", "domain": "10jqka.com.cn", "focus": "转载快讯、上市公司、平台动态", "weight": 6},
+    {"name": "东方财富", "domain": "finance.eastmoney.com", "focus": "上市公司、转载快讯、平台动态", "weight": 6},
+    {"name": "上观新闻", "domain": "shobserver.cn", "focus": "公司动态、上海本地服务、行业报道", "weight": 6},
+    {"name": "观察者网", "domain": "guancha.cn", "focus": "公司动态、平台经济、行业转载", "weight": 6},
+    {"name": "大洋网", "domain": "dayoo.com", "focus": "地方消费、本地生活、民生服务", "weight": 5},
+    {"name": "搜狐", "domain": "sohu.com", "focus": "转载新闻、行业自媒体", "weight": 4},
+    {"name": "网易", "domain": "163.com", "focus": "转载新闻、行业自媒体", "weight": 4},
+    {"name": "今日头条", "domain": "toutiao.com", "focus": "转载新闻、行业自媒体", "weight": 4},
+    {"name": "淘宝技术", "domain": "tech.taobao.org", "focus": "阿里系技术、AI、履约能力", "weight": 7},
+    {"name": "美团技术团队", "domain": "tech.meituan.com", "focus": "美团技术、配送、AI Agent", "weight": 8},
+    {"name": "美团官网", "domain": "meituan.com", "focus": "平台官方动态、本地生活、即时零售", "weight": 8},
+    {"name": "顺丰同城官网", "domain": "sf-cityrush.com", "focus": "同城急送、骑手权益、平台合作", "weight": 8},
+    {"name": "闪送官网", "domain": "ishansong.com", "focus": "一对一急送、产品功能、品牌动态", "weight": 8},
+    {"name": "UU跑腿官网", "domain": "uupt.com", "focus": "跑腿服务、AI 下单、开放能力", "weight": 8},
+    {"name": "达达集团官网", "domain": "imdada.cn", "focus": "即时配送、京东到家、商家履约", "weight": 8},
+    {"name": "京东到家官网", "domain": "jddj.com", "focus": "即时零售、商超便利、平台活动", "weight": 8},
+    {"name": "饿了么官网", "domain": "ele.me", "focus": "本地生活、蜂鸟即配、平台活动", "weight": 8},
+    {"name": "公众号索引", "domain": "mp.weixin.qq.com", "focus": "平台官方、技术团队、行业自媒体", "weight": 5},
+]
+
+HIGH_SIGNAL_SOURCES = [source for source in DATA_SOURCES if source["weight"] >= 8]
+SOURCE_LOOKUP = {source["domain"]: source for source in DATA_SOURCES}
 
 def month_labels() -> list[str]:
     today = datetime.now(CN_TZ)
@@ -52,16 +104,12 @@ def build_queries() -> list[str]:
         "京东秒送 京东外卖 秒送 活动",
         "美团闪购 即时零售 上线 活动",
     ]
-    source_terms = [
-        "site:36kr.com 即时配送 即时零售 闪购 跑腿",
-        "site:huxiu.com 即时配送 即时零售 闪购 跑腿",
-        "site:techweb.com.cn 即时配送 闪购 跑腿 AI",
-        "site:finance.sina.cn 即时配送 跑腿 AI 上线",
-        "site:news.bjd.com.cn 即时配送 跑腿 AI 上线",
-        "site:finance.ce.cn 京东外卖 秒送 上线",
-    ]
+    source_queries = []
+    source_focus_term = "即时配送 即时零售 闪购 跑腿 秒送 AI 上线"
+    for source in HIGH_SIGNAL_SOURCES:
+        source_queries.append(f"site:{source['domain']} {source_focus_term}")
     for month in month_labels():
-        for term in broad_terms + platform_terms + source_terms:
+        for term in broad_terms + platform_terms + source_queries:
             queries.append(f"{month} {term}")
     return queries
 
@@ -167,22 +215,20 @@ def clean_text(value: str) -> str:
 
 
 def source_name(url: str) -> str:
-    if "36kr.com" in url:
-        return "36氪"
-    if "huxiu.com" in url:
-        return "虎嗅"
-    if "techweb.com.cn" in url:
-        return "TechWeb"
-    if "news.bjd.com.cn" in url:
-        return "京报网"
-    if "ce.cn" in url:
-        return "中国经济网"
-    if "10jqka.com.cn" in url:
-        return "同花顺"
-    if "weixin" in url or "mp.weixin.qq.com" in url:
-        return "公众号线索"
+    for domain, source in SOURCE_LOOKUP.items():
+        if domain in url:
+            return source["name"]
+    if "weixin" in url:
+        return "公众号索引"
     host = re.sub(r"^https?://", "", url).split("/")[0]
     return host or "自动抓取"
+
+
+def source_weight(url: str) -> int:
+    for domain, source in SOURCE_LOOKUP.items():
+        if domain in url:
+            return int(source["weight"])
+    return 0
 
 
 def platform_from_text(text: str) -> str:
@@ -219,8 +265,7 @@ def score_candidate(title: str, summary: str, url: str) -> int:
         score += 6
     if re.search(r"7月|07月|2026-07", text):
         score += 10
-    if any(domain in url for domain in ["36kr.com", "huxiu.com", "techweb.com.cn", "news.bjd.com.cn", "ce.cn"]):
-        score += 8
+    score += source_weight(url)
     return max(1, min(score, 99))
 
 
@@ -409,7 +454,7 @@ def inject_candidates(dashboard: Path, candidates: list[dict]) -> None:
     block = (
         "    // AUTO_CANDIDATES_START\n"
         f"    const generatedCandidates = {json.dumps(candidates, ensure_ascii=False, indent=6)};\n"
-        f"    const generatedMeta = {json.dumps({'updatedAt': updated_at, 'sourceCount': len(build_queries())}, ensure_ascii=False)};\n"
+        f"    const generatedMeta = {json.dumps({'updatedAt': updated_at, 'sourceCount': len(DATA_SOURCES), 'queryCount': len(build_queries())}, ensure_ascii=False)};\n"
         "    // AUTO_CANDIDATES_END"
     )
     pattern = re.compile(
