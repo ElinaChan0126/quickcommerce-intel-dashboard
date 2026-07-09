@@ -113,6 +113,12 @@
     .pill.pending { background: #f7ecd2; color: #835806; }
     .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     .tags span { border: 1px solid var(--line); border-radius: 999px; background: var(--soft); color: #3b433a; padding: 6px 9px; font-size: 12px; font-weight: 750; }
+    .tags .business-pill { border-color: transparent; color: #fff; }
+    .business-buyer { background: #2563eb !important; }
+    .business-promo { background: #d97706 !important; }
+    .business-merchant { background: #0f766e !important; }
+    .business-driver { background: #7c3aed !important; }
+    .business-sr { background: #475569 !important; }
     .summary, .judge { margin: 12px 0 0; font-size: 14px; line-height: 1.72; }
     .judge { border-left: 3px solid var(--coral); padding-left: 12px; color: var(--muted); }
     .source-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 14px; }
@@ -586,6 +592,13 @@
     function businessTagOf(item) {
       return item.businessTag || inferBusinessTag(item);
     }
+    function businessClass(tag) {
+      return `business-${String(tag || "S&R").toLowerCase().replace("&", "r").replace(/[^a-z0-9]/g, "")}`;
+    }
+    function businessPill(item) {
+      const tag = businessTagOf(item);
+      return `<span class="business-pill ${businessClass(tag)}">${tag}</span>`;
+    }
     function itemSources(item) {
       const sources = Array.isArray(item.sources) ? item.sources : [];
       const normalized = sources
@@ -670,7 +683,7 @@
             <div class="score">${item.score || 0}</div>
           </div>
           <p class="summary">${item.summary}</p>
-          <div class="tags"><span>${businessTagOf(item)}</span><span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
+          <div class="tags">${businessPill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
           <div class="source-row">
             ${sourceLinks(item)}
             <div class="candidate-actions">
@@ -738,7 +751,7 @@
               <div><p class="platform">${item.platform}</p><h3>${item.title}</h3></div>
               <span class="pill ${item.status === "待复核" ? "pending" : ""}">${item.status}</span>
             </div>
-            <div class="tags"><span>${businessTagOf(item)}</span><span>${item.category}</span><span>${item.type}</span></div>
+            <div class="tags">${businessPill(item)}<span>${item.category}</span><span>${item.type}</span></div>
             <p class="summary">${item.summary}</p>
             <p class="judge">${item.judge}</p>
             <div class="source-row">
