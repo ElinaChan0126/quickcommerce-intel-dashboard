@@ -563,12 +563,14 @@
       form: document.getElementById("capture-form")
     };
     const businessTags = ["Buyer", "Promo", "Merchant", "Driver", "S&R"];
+    const placeholderSummary = "搜索结果未提供摘要，请打开来源复核。";
     const getCustom = () => JSON.parse(localStorage.getItem(storageKey) || "[]");
     const setCustom = items => localStorage.setItem(storageKey, JSON.stringify(items));
     const getIgnored = () => JSON.parse(localStorage.getItem(ignoredCandidateKey) || "[]");
     const setIgnored = items => localStorage.setItem(ignoredCandidateKey, JSON.stringify(items));
     const allItems = () => [...baseIntel, ...getCustom()].sort((a, b) => b.date.localeCompare(a.date));
     const itemMonth = item => (item.date || "").slice(0, 7);
+    const cleanBusinessText = text => String(text || "").replaceAll(placeholderSummary, "");
     const currentMonth = () => selectedMonthFrom(els.month);
     const inSelectedMonth = item => currentMonth() === "全部月份" || itemMonth(item) === currentMonth();
     function unique(values, first) { return [first, ...Array.from(new Set(values))]; }
@@ -579,7 +581,7 @@
       return `${year}年${Number(value)}月`;
     }
     function inferBusinessTags(item) {
-      const text = `${item.platform || ""} ${item.title || ""} ${item.type || ""} ${item.category || ""} ${item.summary || ""} ${item.judge || ""}`;
+      const text = cleanBusinessText(`${item.platform || ""} ${item.title || ""} ${item.type || ""} ${item.category || ""} ${item.summary || ""} ${item.judge || ""}`);
       const rules = [
         ["Buyer", ["用户", "消费者", "下单", "入口", "App", "APP", "小程序", "支付宝", "阿宝", "AI助手", "智能下单", "自然语言", "语音", "体验", "卡片", "订单预览", "频道", "会场", "点餐", "购物", "套餐"]],
         ["Promo", ["活动", "补贴", "优惠", "套餐", "满减", "大促", "618", "世界杯", "看球", "冰冰节", "国补", "低至", "红包"]],
@@ -598,15 +600,79 @@
       const saved = Array.isArray(item.businessTags) && item.businessTags.length
         ? item.businessTags
         : (item.businessTag ? [item.businessTag] : []);
-      const text = `${item.platform || ""} ${item.title || ""} ${item.type || ""} ${item.category || ""} ${item.summary || ""} ${item.judge || ""}`;
+      const text = cleanBusinessText(`${item.platform || ""} ${item.title || ""} ${item.type || ""} ${item.category || ""} ${item.summary || ""} ${item.judge || ""}`);
       let tags = [...new Set([...saved, ...inferred])].filter(Boolean);
       const buyerAiOrder = ["支付宝", "阿宝", "AI", "跑腿", "下单"].some(word => text.includes(word))
         && ["用户", "下单", "卡片", "点餐", "代买", "帮取", "帮送"].some(word => text.includes(word));
+      const runnerSkillOrder = text.includes("跑腿")
+        && (text.includes("Skill") || text.includes("AI助手") || text.includes("AI Agent") || text.includes("Agent"))
+        && ["表单", "对话", "下单", "助手"].some(word => text.includes(word));
       const explicitPromo = ["活动", "补贴", "优惠", "满减", "大促", "世界杯", "看球", "冰冰节", "国补", "红包", "低至"].some(word => text.includes(word));
-      if (buyerAiOrder) tags = ["Buyer", ...tags.filter(tag => tag !== "Promo" && tag !== "Driver" && tag !== "S&R")];
+      if (buyerAiOrder || runnerSkillOrder) tags = ["Buyer"];
       if (tags.includes("Promo") && !explicitPromo) tags = tags.filter(tag => tag !== "Promo");
       return [...new Set(tags)];
     }
+    function eventPlatform(item) {
+      const text = `${item.platform || ""} ${item.title || ""} ${item.summary || ""}`;
+      if (text.includes("美团") && text.includes("跑腿")) return "美团跑腿";
+      if (text.includes("顺丰") && (text.includes("支付宝") || text.includes("阿宝"))) return "顺丰同城";
+      return item.platform || "待识别平台";
+    }
+    function eventKey(item) {
+      const text = cleanBusinessText(`${item.platform || ""} ${item.title || ""} ${item.summary || ""}`);
+      const compact = text.replace(/\s+/g, "");
+      let base = compact.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, "").slice(0, 40);
+      if (compact.includes("美团") && compact.includes("跑腿") && (compact.includes("Skill") || compact.includes("AI助手") || compact.includes("Agent"))) {
+        base = "美团跑腿Skill接入AI助手";
+        return `${eventPlatform(item)}|AI入口|${base}`;
+      } else if (compact.includes("顺丰") && (compact.includes("支付宝") || compact.includes("阿宝")) && compact.includes("AI")) {
+        base = "顺丰同城接入支付宝AI生态";
+        return `${eventPlatform(item)}|AI入口|${base}`;
+      }
+      return `${eventPlatform(item)}|${item.category || "待归类"}|${base}`;
+    }
+    function eventIdFromKey(key) {
+      let hash = 0;
+      for (let index = 0; index < key.length; index += 1) hash = ((hash << 5) - hash + key.charCodeAt(index)) | 0;
+      return `event-${Math.abs(hash).toString(36)}`;
+    }
+    function mergeCandidateItems(items) {
+      const byEvent = new Map();
+      items.forEach(item => {
+        const key = eventKey(item);
+        const nextSources = itemSources(item);
+        if (!byEvent.has(key)) {
+          byEvent.set(key, {
+            ...item,
+            id: eventIdFromKey(key),
+            platform: eventPlatform(item),
+            eventKey: key,
+            candidateIds: [item.id],
+            sources: nextSources,
+            sourceCount: nextSources.length || 1,
+            businessTags: businessTagsOf(item),
+            businessTag: businessTagsOf(item)[0] || ""
+          });
+          return;
+        }
+        const existing = byEvent.get(key);
+        const knownUrls = new Set(itemSources(existing).map(source => source.url));
+        existing.candidateIds = [...new Set([...(existing.candidateIds || []), item.id])];
+        nextSources.forEach(source => {
+          if (source.url && !knownUrls.has(source.url)) existing.sources.push(source);
+        });
+        existing.sourceCount = itemSources(existing).length;
+        existing.score = Math.min(99, Math.max(existing.score || 0, item.score || 0) + Math.min(8, existing.sourceCount - 1));
+        if ((item.date || "") > (existing.date || "")) existing.date = item.date;
+        if ((item.summary || "").length > (existing.summary || "").length) existing.summary = item.summary;
+        existing.sourceName = itemSources(existing).slice(0, 3).map(source => source.name).join(" / ");
+        existing.sourceUrl = itemSources(existing)[0]?.url || existing.sourceUrl;
+        existing.businessTags = businessTagsOf(existing);
+        existing.businessTag = existing.businessTags[0] || "";
+      });
+      return [...byEvent.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
+    }
+    const candidatePool = () => mergeCandidateItems(generatedCandidates);
     function businessClass(tag) {
       if (tag === "S&R") return "business-sr";
       return `business-${String(tag || "S&R").toLowerCase().replace("&", "r").replace(/[^a-z0-9]/g, "")}`;
@@ -639,7 +705,7 @@
       return sources[0]?.name || item.sourceName || "自动抓取";
     }
     function allMonths() {
-      const months = [...allItems(), ...generatedCandidates]
+      const months = [...allItems(), ...candidatePool()]
         .map(itemMonth)
         .filter(Boolean)
         .sort()
@@ -675,8 +741,8 @@
     function currentCandidates() {
       const existingUrls = new Set(allItems().flatMap(item => itemSources(item).map(source => source.url)));
       const ignored = new Set(getIgnored());
-      return generatedCandidates
-        .filter(item => !ignored.has(item.id))
+      return candidatePool()
+        .filter(item => !ignored.has(item.id) && !(item.candidateIds || []).some(id => ignored.has(id)))
         .filter(item => !itemSources(item).some(source => existingUrls.has(source.url)))
         .filter(inSelectedMonth)
         .sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -711,7 +777,7 @@
         </article>`).join("");
       list.querySelectorAll("[data-accept]").forEach(button => {
         button.addEventListener("click", () => {
-          const item = generatedCandidates.find(candidate => candidate.id === button.dataset.accept);
+          const item = candidatePool().find(candidate => candidate.id === button.dataset.accept);
           if (!item) return;
           const saved = {
             id: `custom-${item.id}`,
@@ -731,7 +797,7 @@
             priority: item.score >= 80 ? "高" : "中"
           };
           setCustom([saved, ...getCustom()]);
-          setIgnored([...new Set([...getIgnored(), item.id])]);
+          setIgnored([...new Set([...getIgnored(), item.id, ...(item.candidateIds || [])])]);
           renderFilters();
           renderCandidates();
           renderList();
@@ -739,7 +805,8 @@
       });
       list.querySelectorAll("[data-ignore]").forEach(button => {
         button.addEventListener("click", () => {
-          setIgnored([...new Set([...getIgnored(), button.dataset.ignore])]);
+          const item = candidatePool().find(candidate => candidate.id === button.dataset.ignore);
+          setIgnored([...new Set([...getIgnored(), button.dataset.ignore, ...((item && item.candidateIds) || [])])]);
           renderCandidates();
         });
       });

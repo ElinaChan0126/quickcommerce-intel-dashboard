@@ -337,6 +337,7 @@ BUSINESS_TAG_RULES = [
 ]
 
 DRIVER_EXCLUDE_TERMS = ["用户", "消费者", "下单", "入口", "支付宝", "阿宝", "AI助手", "智能下单", "自然语言", "语音", "小程序"]
+BUSINESS_PLACEHOLDER_TEXT = "搜索结果未提供摘要，请打开来源复核。"
 
 EVENT_KEY_TERMS = [
     "支付宝",
@@ -442,6 +443,8 @@ def term_source_weight(text: str) -> int:
 
 def platform_from_text(text: str) -> str:
     compact = re.sub(r"\s+", "", text)
+    if "美团" in compact and "跑腿" in compact:
+        return "美团跑腿"
     hits = [name for name in PLATFORM_HINTS if name in compact]
     if "京东外卖" in hits and "京东秒送" in hits:
         return "京东外卖 / 秒送"
@@ -461,13 +464,29 @@ def category_from_text(text: str) -> str:
     return "待归类"
 
 
+def business_text(text: str) -> str:
+    return text.replace(BUSINESS_PLACEHOLDER_TEXT, "")
+
+
 def business_tags_from_text(text: str) -> list[str]:
+    text = business_text(text)
     tags = []
     for tag, words in BUSINESS_TAG_RULES:
         if any(word in text for word in words):
             if tag == "Driver" and any(word in text for word in DRIVER_EXCLUDE_TERMS):
                 continue
             tags.append(tag)
+    buyer_ai_order = any(word in text for word in ["支付宝", "阿宝", "AI", "跑腿", "下单"]) and any(
+        word in text for word in ["用户", "下单", "卡片", "点餐", "代买", "帮取", "帮送"]
+    )
+    runner_skill_order = "跑腿" in text and any(word in text for word in ["Skill", "AI助手", "AI Agent", "Agent"]) and any(
+        word in text for word in ["表单", "对话", "下单", "助手"]
+    )
+    explicit_promo = any(word in text for word in ["活动", "补贴", "优惠", "满减", "大促", "世界杯", "看球", "冰冰节", "国补", "红包", "低至"])
+    if buyer_ai_order or runner_skill_order:
+        tags = ["Buyer"]
+    if "Promo" in tags and not explicit_promo:
+        tags = [tag for tag in tags if tag != "Promo"]
     return tags
 
 
@@ -564,16 +583,22 @@ def event_words(text: str) -> list[str]:
 
 def normalized_event_key(candidate: dict) -> str:
     text = f"{candidate.get('title', '')} {candidate.get('summary', '')}"
+    clean = business_text(text)
+    compact = re.sub(r"\s+", "", clean)
+    if "美团" in compact and "跑腿" in compact and any(word in compact for word in ["Skill", "AI助手", "Agent"]):
+        return "美团跑腿|AI入口|美团跑腿Skill接入AI助手"
+    if "顺丰" in compact and any(word in compact for word in ["支付宝", "阿宝"]) and "AI" in compact:
+        return "顺丰同城|AI入口|顺丰同城接入支付宝AI生态"
     words = event_words(text)
     if words:
         base = "|".join(words)
         if not any(word in text for word in EVENT_KEY_TERMS):
-            base = f"{base}|{re.sub(r'[\W_]+', '', text.lower())[:18]}"
+            normalized_text = re.sub(r"[\W_]+", "", text.lower())[:18]
+            base = f"{base}|{normalized_text}"
     else:
         base = re.sub(r"[\W_]+", "", text.lower())[:28]
     return "|".join([
         candidate.get("platform") or "待识别平台",
-        ",".join(candidate.get("businessTags") or [candidate.get("businessTag") or "未标记"]),
         candidate.get("category") or "待归类",
         base,
     ])
