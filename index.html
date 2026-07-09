@@ -118,6 +118,9 @@
     .source-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 14px; }
     .source-row a, .source-row button { border: 0; background: transparent; color: var(--teal); font-size: 13px; font-weight: 850; text-decoration: none; }
     .source-row button { color: var(--coral); }
+    .source-links { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+    .source-links a { border: 1px solid var(--line); border-radius: 999px; background: var(--soft); padding: 6px 9px; }
+    .source-count { color: var(--muted); font-size: 12px; font-weight: 850; }
     .rail { display: grid; gap: 18px; }
     form { display: grid; gap: 12px; margin-top: 16px; }
     textarea { min-height: 112px; resize: vertical; }
@@ -564,6 +567,28 @@
       const [year, value] = month.split("-");
       return `${year}年${Number(value)}月`;
     }
+    function itemSources(item) {
+      const sources = Array.isArray(item.sources) ? item.sources : [];
+      const normalized = sources
+        .filter(source => source && source.url)
+        .map(source => ({ name: source.name || "来源", url: source.url }));
+      if (normalized.length) return normalized;
+      return item.sourceUrl ? [{ name: item.sourceName || "来源", url: item.sourceUrl }] : [];
+    }
+    function sourceLinks(item) {
+      const sources = itemSources(item);
+      if (!sources.length) return `<span class="source-count">暂无来源链接</span>`;
+      const links = sources.slice(0, 5).map((source, index) =>
+        `<a href="${source.url}" target="_blank" rel="noreferrer">${source.name || `来源${index + 1}`}</a>`
+      ).join("");
+      const more = sources.length > 5 ? `<span class="source-count">+${sources.length - 5} 个来源</span>` : "";
+      return `<div class="source-links">${links}${more}</div>`;
+    }
+    function sourceLabel(item) {
+      const sources = itemSources(item);
+      if (sources.length > 1) return `多来源 ${sources.length} 个`;
+      return sources[0]?.name || item.sourceName || "自动抓取";
+    }
     function allMonths() {
       const months = [...allItems(), ...generatedCandidates]
         .map(itemMonth)
@@ -597,11 +622,11 @@
       document.getElementById("metric-review").textContent = scoped.filter(i => i.status === "待复核").length;
     }
     function currentCandidates() {
-      const existingUrls = new Set(allItems().map(item => item.sourceUrl));
+      const existingUrls = new Set(allItems().flatMap(item => itemSources(item).map(source => source.url)));
       const ignored = new Set(getIgnored());
       return generatedCandidates
         .filter(item => !ignored.has(item.id))
-        .filter(item => !existingUrls.has(item.sourceUrl))
+        .filter(item => !itemSources(item).some(source => existingUrls.has(source.url)))
         .filter(inSelectedMonth)
         .sort((a, b) => (b.score || 0) - (a.score || 0));
     }
@@ -624,9 +649,9 @@
             <div class="score">${item.score || 0}</div>
           </div>
           <p class="summary">${item.summary}</p>
-          <div class="tags"><span>${item.category || "候选"}</span><span>${item.sourceName || "自动抓取"}</span></div>
+          <div class="tags"><span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
           <div class="source-row">
-            <a href="${item.sourceUrl}" target="_blank" rel="noreferrer">查看来源</a>
+            ${sourceLinks(item)}
             <div class="candidate-actions">
               <button data-accept="${item.id}" type="button">确认入库</button>
               <button data-ignore="${item.id}" type="button">忽略</button>
@@ -648,6 +673,7 @@
             judge: item.judge || "自动抓取候选，已确认入库，建议在日报会上补充业务影响判断。",
             sourceName: item.sourceName || "自动抓取",
             sourceUrl: item.sourceUrl,
+            sources: itemSources(item),
             status: "待复核",
             priority: item.score >= 80 ? "高" : "中"
           };
@@ -692,7 +718,7 @@
             <p class="summary">${item.summary}</p>
             <p class="judge">${item.judge}</p>
             <div class="source-row">
-              <a href="${item.sourceUrl}" target="_blank" rel="noreferrer">${item.sourceName}</a>
+              ${sourceLinks(item)}
               ${item.id.startsWith("custom-") ? `<button data-remove="${item.id}" type="button">删除</button>` : ""}
             </div>
           </div>
@@ -719,6 +745,7 @@
         judge: "待产品经理补充判断，可在日报会上确认影响级别。",
         sourceName: document.getElementById("source").value.trim() ? "手动来源" : "未填来源",
         sourceUrl: document.getElementById("source").value.trim() || "#",
+        sources: document.getElementById("source").value.trim() ? [{ name: "手动来源", url: document.getElementById("source").value.trim() }] : [],
         status: "待复核",
         priority: "中"
       };

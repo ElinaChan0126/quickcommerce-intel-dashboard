@@ -243,9 +243,12 @@ def source_inventory_count() -> int:
     return len(ALL_WEB_SOURCES) + len(ACCOUNT_TERMS) + len(PLATFORM_SEARCH_TERMS) + len(REPORT_SOURCES) + len(NEWS_SEARCH_CHANNELS)
 
 PLATFORM_HINTS = [
+    "淘宝闪购城市骑士",
     "淘宝闪购",
     "美团闪购",
     "美团跑腿",
+    "美团骑手",
+    "美团众包",
     "美团外卖",
     "京东秒送",
     "京东外卖",
@@ -254,10 +257,12 @@ PLATFORM_HINTS = [
     "顺丰同城急送",
     "闪送",
     "UU跑腿",
+    "达达秒送骑士",
     "达达快送",
     "达达秒送",
     "滴滴快送",
     "蜂鸟即配",
+    "蜂鸟众包",
     "货拉拉",
     "裹小递",
     "饿了么",
@@ -323,6 +328,33 @@ CATEGORY_RULES = [
     ("供给履约", ["前置仓", "门店", "仓", "商家", "服务商"]),
 ]
 
+EVENT_KEY_TERMS = [
+    "支付宝",
+    "阿宝",
+    "AI生态",
+    "AI助手",
+    "跑腿Skill",
+    "Skill",
+    "智能下单",
+    "自然语言",
+    "语音下单",
+    "超时免罚",
+    "看球",
+    "套餐",
+    "冰冰节",
+    "燎原",
+    "前置仓",
+    "闪电仓",
+    "骑士",
+    "骑手",
+    "商家中心",
+    "智能硬件",
+    "下沉市场",
+    "服务商",
+]
+
+EVENT_SPLIT_RE = re.compile(r"[；;]\s*|(?<!\d)[。](?!\d)|\s+[|｜]\s+")
+
 
 def fetch(url: str, timeout: int = 18) -> str:
     request = Request(
@@ -341,6 +373,13 @@ def clean_text(value: str) -> str:
     value = re.sub(r"<[^>]+>", " ", value)
     value = re.sub(r"\s+", " ", value).strip()
     return value
+
+
+def source_object(url: str, text: str) -> dict:
+    return {
+        "name": source_name_from_text(url, text),
+        "url": url,
+    }
 
 
 def source_name(url: str) -> str:
@@ -362,6 +401,9 @@ def account_from_text(text: str) -> str | None:
 
 
 def source_name_from_text(url: str, text: str) -> str:
+    for domain, source in SOURCE_LOOKUP.items():
+        if domain in url and "mp.weixin.qq.com" not in url:
+            return source["name"]
     account = account_from_text(text)
     if account:
         return account
@@ -481,6 +523,129 @@ def candidate_id(url: str, title: str) -> str:
     return f"auto-{digest}"
 
 
+def event_words(text: str) -> list[str]:
+    compact = re.sub(r"\s+", "", text)
+    words = []
+    for word in EVENT_KEY_TERMS:
+        if re.sub(r"\s+", "", word) in compact:
+            words.append(word)
+    for keyword in KEYWORDS:
+        if len(words) >= 3:
+            break
+        if keyword in text and keyword not in words:
+            words.append(keyword)
+    return words[:5]
+
+
+def normalized_event_key(candidate: dict) -> str:
+    text = f"{candidate.get('title', '')} {candidate.get('summary', '')}"
+    words = event_words(text)
+    if words:
+        base = "|".join(words)
+        if not any(word in text for word in EVENT_KEY_TERMS):
+            base = f"{base}|{re.sub(r'[\W_]+', '', text.lower())[:18]}"
+    else:
+        base = re.sub(r"[\W_]+", "", text.lower())[:28]
+    return "|".join([
+        candidate.get("platform") or "待识别平台",
+        candidate.get("category") or "待归类",
+        base,
+    ])
+
+
+def split_event_text(title: str, description: str) -> list[tuple[str, str]]:
+    text = clean_text(f"{title}。{description}")
+    parts = [part.strip(" -_，,") for part in EVENT_SPLIT_RE.split(text)]
+    parts = [part for part in parts if len(part) >= 12]
+    relevant_words = ["闪购", "即时零售", "跑腿", "秒送", "同城", "外卖", "骑手", "骑士", *PLATFORM_HINTS]
+    event_parts = []
+    for part in parts:
+        if not any(word in part for word in relevant_words):
+            continue
+        if not any(word in part for word in ["上线", "发布", "接入", "启动", "开启", "升级", "活动", "AI", "补贴", "规则", "治理", "权益"]):
+            continue
+        event_parts.append(part)
+    if len(event_parts) <= 1:
+        return [(title, description)]
+    events = []
+    seen = set()
+    for part in event_parts:
+        key = re.sub(r"\W+", "", part.lower())[:36]
+        if key in seen:
+            continue
+        seen.add(key)
+        event_title = part[:72]
+        event_summary = part if len(part) <= 180 else f"{part[:177]}..."
+        events.append((event_title, event_summary))
+    return events or [(title, description)]
+
+
+def make_candidate(title: str, description: str, link: str, pub_date: str = "") -> dict | None:
+    text = f"{title} {description}"
+    if not any(word in text for word in ["闪购", "即时零售", "跑腿", "秒送", "同城", "外卖", "骑手", "骑士"]):
+        return None
+    score = score_candidate(title, description, link)
+    if score < 46:
+        return None
+    sources = [source_object(link, text)]
+    return {
+        "id": candidate_id(link, title),
+        "date": parse_date(pub_date, f"{text} {link}"),
+        "platform": platform_from_text(text),
+        "title": title,
+        "type": "自动候选",
+        "category": category_from_text(text),
+        "summary": description[:180] or "搜索结果未提供摘要，请打开来源复核。",
+        "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+        "sourceName": sources[0]["name"],
+        "sourceUrl": link,
+        "sources": sources,
+        "score": score,
+    }
+
+
+def candidates_from_result(title: str, description: str, link: str, pub_date: str = "") -> list[dict]:
+    candidates = []
+    for event_title, event_description in split_event_text(title, description):
+        candidate = make_candidate(event_title, event_description, link, pub_date)
+        if candidate:
+            candidates.append(candidate)
+    return candidates
+
+
+def merge_candidates(candidates: list[dict]) -> list[dict]:
+    merged: list[dict] = []
+    index: dict[str, dict] = {}
+    for candidate in candidates:
+        key = normalized_event_key(candidate)
+        candidate["eventKey"] = key
+        if key not in index:
+            candidate["sources"] = candidate.get("sources") or [source_object(candidate.get("sourceUrl", ""), candidate.get("title", ""))]
+            candidate["sourceCount"] = len(candidate["sources"])
+            digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
+            candidate["id"] = f"event-{digest}"
+            index[key] = candidate
+            merged.append(candidate)
+            continue
+        existing = index[key]
+        existing_sources = existing.setdefault("sources", [])
+        known_urls = {source.get("url") for source in existing_sources}
+        for source in candidate.get("sources", []):
+            if source.get("url") and source.get("url") not in known_urls:
+                existing_sources.append(source)
+                known_urls.add(source.get("url"))
+        existing["sourceCount"] = len(existing_sources)
+        existing["score"] = min(99, max(existing.get("score", 0), candidate.get("score", 0)) + min(8, len(existing_sources) - 1))
+        if candidate.get("date", "") > existing.get("date", ""):
+            existing["date"] = candidate["date"]
+        if len(candidate.get("summary", "")) > len(existing.get("summary", "")):
+            existing["summary"] = candidate["summary"]
+        existing["sourceName"] = " / ".join(source.get("name", "来源") for source in existing_sources[:3])
+        existing["sourceUrl"] = existing_sources[0].get("url", existing.get("sourceUrl", "#"))
+    merged.sort(key=lambda item: (item.get("score", 0), item.get("sourceCount", 1), item.get("date", "")), reverse=True)
+    return merged
+
+
 def parse_bing_rss(xml_text: str) -> list[dict]:
     root = ElementTree.fromstring(xml_text)
     candidates = []
@@ -491,27 +656,7 @@ def parse_bing_rss(xml_text: str) -> list[dict]:
         pub_date = clean_text(item.findtext("pubDate", ""))
         if not title or not link:
             continue
-        text = f"{title} {description}"
-        if not any(word in text for word in ["闪购", "即时零售", "跑腿", "秒送", "同城", "外卖"]):
-            continue
-        score = score_candidate(title, description, link)
-        if score < 46:
-            continue
-        candidates.append(
-            {
-                "id": candidate_id(link, title),
-                "date": parse_date(pub_date, f"{text} {link}"),
-                "platform": platform_from_text(text),
-                "title": title,
-                "type": "自动候选",
-                "category": category_from_text(text),
-                "summary": description[:180] or "搜索结果未提供摘要，请打开来源复核。",
-                "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
-                "sourceName": source_name_from_text(link, text),
-                "sourceUrl": link,
-                "score": score,
-            }
-        )
+        candidates.extend(candidates_from_result(title, description, link, pub_date))
     return candidates
 
 
@@ -533,33 +678,12 @@ def parse_so_results(html_text: str) -> list[dict]:
         description = clean_text(description_match.group(1)) if description_match else ""
         if not title or not link:
             continue
-        text = f"{title} {description}"
-        if not any(word in text for word in ["闪购", "即时零售", "跑腿", "秒送", "同城", "外卖"]):
-            continue
-        score = score_candidate(title, description, link)
-        if score < 46:
-            continue
-        candidates.append(
-            {
-                "id": candidate_id(link, title),
-                "date": parse_date("", f"{text} {link}"),
-                "platform": platform_from_text(text),
-                "title": title,
-                "type": "自动候选",
-                "category": category_from_text(text),
-                "summary": description[:180] or "搜索结果未提供摘要，请打开来源复核。",
-                "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
-                "sourceName": source_name_from_text(link, text),
-                "sourceUrl": link,
-                "score": score,
-            }
-        )
+        candidates.extend(candidates_from_result(title, description, link))
     return candidates
 
 
 def collect_candidates() -> list[dict]:
     seen = set()
-    seen_titles = set()
     collected = []
     cutoff = (datetime.now(CN_TZ) - timedelta(days=RECENT_DAYS)).date()
     for query in build_queries():
@@ -583,7 +707,6 @@ def collect_candidates() -> list[dict]:
                 actual_date = source_date(candidate["sourceUrl"])
                 if actual_date:
                     candidate["date"] = actual_date
-            title_key = re.sub(r"\W+", "", candidate["title"].lower())[:40]
             try:
                 candidate_date = datetime.fromisoformat(candidate["date"]).date()
             except ValueError:
@@ -596,13 +719,9 @@ def collect_candidates() -> list[dict]:
                 continue
             if candidate["id"] in seen:
                 continue
-            if title_key in seen_titles:
-                continue
             seen.add(candidate["id"])
-            seen_titles.add(title_key)
             collected.append(candidate)
-    collected.sort(key=lambda item: (item["score"], item["date"]), reverse=True)
-    return collected[:20]
+    return merge_candidates(collected)[:20]
 
 
 def inject_candidates(dashboard: Path, candidates: list[dict]) -> None:
