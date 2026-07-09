@@ -361,6 +361,39 @@ NEGATIVE_KEYWORDS = {
     "最新相关消息": 30,
 }
 
+BUYER_CORE_TERMS = [
+    "用户",
+    "消费者",
+    "下单",
+    "入口",
+    "App",
+    "APP",
+    "小程序",
+    "支付宝",
+    "阿宝",
+    "AI助手",
+    "智能下单",
+    "自然语言",
+    "语音",
+    "订单预览",
+    "服务卡片",
+    "卡片",
+    "点餐",
+    "购物",
+    "代买",
+    "帮取",
+    "帮送",
+    "订单查询",
+    "骑手位置",
+    "配送进度",
+    "支付",
+]
+
+BUYER_DELIVERY_TERMS = ["跑腿", "同城", "即时配送", "同城急送", "一对一急送", "秒送", "配送", "直送", "履约", "外卖"]
+BUYER_EXPERIENCE_TERMS = ["体验", "频道", "会场", "搜索", "推荐", "时效", "价格预估", "地址", "手机号", "选择成本", "填写"]
+NON_BUYER_DOMAIN_TERMS = ["商家", "商户", "服务商", "经营", "店铺", "代运营", "培训", "课堂", "智能硬件", "前置仓", "餐饮系统", "骑手", "骑士", "众包", "运力", "超时", "免罚", "骑手权益", "骑士权益"]
+CAPITAL_MARKET_TERMS = ["股价", "证券", "研报", "财报", "融资", "资本市场", "港股", "上市公司"]
+
 EXCLUDED_URL_PARTS = [
     "douyin.com",
     "post.smzdm.com",
@@ -543,6 +576,47 @@ def business_tag_from_text(text: str) -> str:
     return tags[0] if tags else ""
 
 
+def buyer_relevance(text: str) -> tuple[int, str]:
+    text = business_text(text)
+    has_buyer = any(word in text for word in BUYER_CORE_TERMS)
+    has_delivery = any(word in text for word in BUYER_DELIVERY_TERMS)
+    has_experience = any(word in text for word in BUYER_EXPERIENCE_TERMS)
+    has_non_buyer = any(word in text for word in NON_BUYER_DOMAIN_TERMS)
+    has_capital = any(word in text for word in CAPITAL_MARKET_TERMS)
+    tags = business_tags_from_text(text)
+    score = 0
+    reasons = []
+    if has_buyer and has_delivery:
+        score += 28
+        reasons.append("买家下单/履约链路")
+    elif has_buyer:
+        score += 18
+        reasons.append("买家入口或体验")
+    if any(word in text for word in ["AI", "AI助手", "阿宝", "智能下单", "自然语言", "语音"]) and has_buyer:
+        score += 14
+        reasons.append("AI 买家入口")
+    if has_experience and has_delivery:
+        score += 8
+        reasons.append("买家体验细节")
+    if "Buyer" in tags:
+        score += 8
+    if has_non_buyer and "Buyer" not in tags:
+        score -= 20
+        reasons.append("偏商家/骑手端")
+    if has_capital and not has_buyer:
+        score -= 12
+        reasons.append("偏资本市场")
+    if score >= 34:
+        level = "买家侧高相关"
+    elif score >= 18:
+        level = "买家侧相关"
+    elif score > 0:
+        level = "买家侧弱相关"
+    else:
+        level = "非买家侧优先"
+    return score, " / ".join(reasons) or level
+
+
 def score_candidate(title: str, summary: str, url: str) -> int:
     text = f"{title} {summary} {url}"
     score = 28
@@ -557,6 +631,8 @@ def score_candidate(title: str, summary: str, url: str) -> int:
     if re.search(r"7月|07月|2026-07", text):
         score += 10
     score += source_weight(url) + term_source_weight(text)
+    relevance_score, _ = buyer_relevance(text)
+    score += relevance_score
     return max(1, min(score, 99))
 
 
@@ -687,6 +763,7 @@ def make_candidate(title: str, description: str, link: str, pub_date: str = "") 
     if score < 46:
         return None
     sources = [source_object(link, text)]
+    relevance_score, relevance_reason = buyer_relevance(text)
     return {
         "id": candidate_id(link, title),
         "date": parse_date(pub_date, f"{text} {link}"),
@@ -702,6 +779,8 @@ def make_candidate(title: str, description: str, link: str, pub_date: str = "") 
         "sourceUrl": link,
         "sources": sources,
         "score": score,
+        "buyerRelevance": relevance_score,
+        "relevanceReason": relevance_reason,
     }
 
 

@@ -98,6 +98,7 @@
     .candidate-top { display: flex; justify-content: space-between; gap: 14px; align-items: start; }
     .candidate-top h3 { margin-top: 4px; font-size: 18px; line-height: 1.35; }
     .score { min-width: 54px; border-radius: 8px; background: #dff1ea; color: #095f51; padding: 8px 10px; text-align: center; font-weight: 850; }
+    .score small { display: block; margin-top: 3px; color: #347568; font-size: 10px; font-weight: 850; }
     .candidate-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .candidate-actions button { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); padding: 9px 12px; font-size: 13px; font-weight: 850; }
     .candidate-actions button:first-child { border-color: var(--teal); background: var(--teal); color: #fff; }
@@ -117,6 +118,7 @@
     .tags button { cursor: pointer; }
     .tags .business-pill { border-color: transparent; color: #fff; }
     .tags .business-empty { background: #fff; border-style: dashed; color: var(--muted); }
+    .tags .relevance-pill { background: #eef6ff; border-color: #c7ddf8; color: #214f86; }
     .business-buyer { background: #2563eb !important; }
     .business-promo { background: #d97706 !important; }
     .business-merchant { background: #0f766e !important; }
@@ -621,6 +623,11 @@
       form: document.getElementById("capture-form")
     };
     const businessTags = ["Buyer", "Promo", "Merchant", "Driver", "S&R"];
+    const buyerCoreTerms = ["用户", "消费者", "下单", "入口", "App", "APP", "小程序", "支付宝", "阿宝", "AI助手", "智能下单", "自然语言", "语音", "订单预览", "服务卡片", "卡片", "点餐", "购物", "代买", "帮取", "帮送", "订单查询", "骑手位置", "配送进度", "支付"];
+    const buyerDeliveryTerms = ["跑腿", "同城", "即时配送", "同城急送", "一对一急送", "秒送", "配送", "直送", "履约", "外卖"];
+    const buyerExperienceTerms = ["体验", "频道", "会场", "搜索", "推荐", "时效", "价格预估", "地址", "手机号", "选择成本", "填写"];
+    const nonBuyerDomainTerms = ["商家", "商户", "服务商", "经营", "店铺", "代运营", "培训", "课堂", "智能硬件", "前置仓", "餐饮系统", "骑手", "骑士", "众包", "运力", "超时", "免罚", "骑手权益", "骑士权益"];
+    const capitalMarketTerms = ["股价", "证券", "研报", "财报", "融资", "资本市场", "港股", "上市公司"];
     const placeholderSummary = "搜索结果未提供摘要，请打开来源复核。";
     const getCustom = () => JSON.parse(localStorage.getItem(storageKey) || "[]");
     const setCustom = items => localStorage.setItem(storageKey, JSON.stringify(items));
@@ -806,7 +813,7 @@
         existing.businessTags = businessTagsOf(existing);
         existing.businessTag = existing.businessTags[0] || "";
       });
-      return [...byEvent.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
+      return [...byEvent.values()].sort((a, b) => candidateScore(b) - candidateScore(a));
     }
     const candidatePool = () => mergeCandidateItems(generatedCandidates);
     function businessClass(tag) {
@@ -817,6 +824,56 @@
       const tags = businessTagsOf(item);
       if (!tags.length) return `<button class="business-empty" data-tag-menu-for="${item.id}" type="button">未标记</button>`;
       return tags.map(tag => `<button class="business-pill ${businessClass(tag)}" data-tag-menu-for="${item.id}" type="button">${tag}</button>`).join("");
+    }
+    function buyerRelevanceOf(item) {
+      const text = cleanBusinessText(`${item.platform || ""} ${item.title || ""} ${item.type || ""} ${item.category || ""} ${item.summary || ""} ${item.judge || ""}`);
+      const tags = businessTagsOf(item);
+      const hasBuyer = buyerCoreTerms.some(word => text.includes(word));
+      const hasDelivery = buyerDeliveryTerms.some(word => text.includes(word));
+      const hasExperience = buyerExperienceTerms.some(word => text.includes(word));
+      const hasNonBuyer = nonBuyerDomainTerms.some(word => text.includes(word));
+      const hasCapital = capitalMarketTerms.some(word => text.includes(word));
+      const reasons = [];
+      let score = 0;
+      if (hasBuyer && hasDelivery) {
+        score += 28;
+        reasons.push("买家下单/履约链路");
+      } else if (hasBuyer) {
+        score += 18;
+        reasons.push("买家入口或体验");
+      }
+      if (["AI", "AI助手", "阿宝", "智能下单", "自然语言", "语音"].some(word => text.includes(word)) && hasBuyer) {
+        score += 14;
+        reasons.push("AI 买家入口");
+      }
+      if (hasExperience && hasDelivery) {
+        score += 8;
+        reasons.push("买家体验细节");
+      }
+      if (tags.includes("Buyer")) score += 8;
+      if (hasNonBuyer && !tags.includes("Buyer")) {
+        score -= 20;
+        reasons.push("偏商家/骑手端");
+      }
+      if (hasCapital && !hasBuyer) {
+        score -= 12;
+        reasons.push("偏资本市场");
+      }
+      let level = "非买家侧优先";
+      if (score >= 34) level = "买家侧高相关";
+      else if (score >= 18) level = "买家侧相关";
+      else if (score > 0) level = "买家侧弱相关";
+      return { score, level, reason: reasons.join(" / ") || level };
+    }
+    function candidateScore(item) {
+      const relevance = buyerRelevanceOf(item);
+      const storedRelevance = Number(item.buyerRelevance);
+      const baseScore = Number(item.score || 0) - (Number.isFinite(storedRelevance) ? storedRelevance : 0);
+      return Math.max(1, Math.min(99, Math.round(baseScore + relevance.score)));
+    }
+    function relevancePill(item) {
+      const relevance = buyerRelevanceOf(item);
+      return `<span class="relevance-pill" title="${escapeHtml(relevance.reason)}">${relevance.level}</span>`;
     }
     function itemSources(item) {
       const sources = Array.isArray(item.sources) ? item.sources : [];
@@ -962,7 +1019,7 @@
         .filter(item => !hiddenIds.has(item.id) && !(item.candidateIds || []).some(id => hiddenIds.has(id)))
         .filter(item => !itemSources(item).some(source => existingUrls.has(source.url)))
         .filter(inSelectedMonth)
-        .sort((a, b) => (b.score || 0) - (a.score || 0));
+        .sort((a, b) => candidateScore(b) - candidateScore(a));
     }
     function itemFromTrashRecord(record) {
       if (record.item) return record.item;
@@ -1059,10 +1116,10 @@
               <p class="platform">${item.platform || "待识别平台"} · ${item.date || "日期待识别"}</p>
               <h3>${item.title}</h3>
             </div>
-            <div class="score">${item.score || 0}</div>
+            <div class="score">${candidateScore(item)}<small>买家侧</small></div>
           </div>
           <p class="summary">${item.summary}</p>
-          <div class="tags">${businessPill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
+          <div class="tags">${businessPill(item)}${relevancePill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
           <div class="source-row">
             ${sourceLinks(item)}
             <div class="candidate-actions">
@@ -1075,6 +1132,7 @@
         button.addEventListener("click", () => {
           const item = candidatePool().find(candidate => candidate.id === button.dataset.accept);
           if (!item) return;
+          const relevance = buyerRelevanceOf(item);
           const saved = {
             id: `custom-${item.id}`,
             date: item.date || "2026-07-08",
@@ -1090,7 +1148,9 @@
             sourceUrl: item.sourceUrl,
             sources: itemSources(item),
             status: "待复核",
-            priority: item.score >= 80 ? "高" : "中"
+            priority: candidateScore(item) >= 80 ? "高" : "中",
+            buyerRelevance: relevance.score,
+            relevanceReason: relevance.reason
           };
           setCustom([saved, ...getCustom()]);
           addPurgedIds(itemCandidateIds(item));
@@ -1129,10 +1189,10 @@
                 <p class="platform">${item.platform || "候选池"} · 删除于 ${record.deletedAt} · 剩余 ${left} 天</p>
                 <h3>${item.title}</h3>
               </div>
-              <div class="score">${item.score || 0}</div>
+              <div class="score">${candidateScore(item)}<small>买家侧</small></div>
             </div>
             <p class="summary">${item.summary || "暂无摘要"}</p>
-            <div class="tags">${businessPill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
+            <div class="tags">${businessPill(item)}${relevancePill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
             <div class="source-row">
               ${sourceLinks(item)}
               <div class="candidate-actions">
@@ -1187,7 +1247,7 @@
                 <button data-edit-item="${item.id}" type="button">编辑</button>
               </div>
             </div>
-            <div class="tags">${businessPill(item)}<span>${item.category}</span><span>${item.type}</span></div>
+            <div class="tags">${businessPill(item)}${relevancePill(item)}<span>${item.category}</span><span>${item.type}</span></div>
             ${itemEditPanel(item)}
             <p class="summary">${escapeHtml(item.summary)}</p>
             <p class="judge">${escapeHtml(item.judge)}</p>
