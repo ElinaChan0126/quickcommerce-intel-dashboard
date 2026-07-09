@@ -72,8 +72,120 @@ DATA_SOURCES = [
     {"name": "公众号索引", "domain": "mp.weixin.qq.com", "focus": "平台官方、技术团队、行业自媒体", "weight": 5},
 ]
 
-HIGH_SIGNAL_SOURCES = [source for source in DATA_SOURCES if source["weight"] >= 8]
-SOURCE_LOOKUP = {source["domain"]: source for source in DATA_SOURCES}
+WECHAT_ACCOUNTS = {
+    "行业媒体": [
+        "晚点LatePost",
+        "虎嗅",
+        "虎嗅APP",
+        "36氪",
+        "36氪出海",
+        "36氪未来消费",
+        "雷峰网",
+        "雷锋网",
+        "起点财经",
+        "创新零售社",
+        "DT商业观察",
+        "张大爷聊外卖",
+        "陈罡Pro",
+        "海豚投研",
+        "海豚研究",
+        "零售商业财经",
+        "走马财经",
+        "即时刘说",
+        "墨腾创投",
+        "剑非观点",
+        "投研小透明",
+        "Tech星球",
+        "第三只眼看零售",
+    ],
+    "平台官方": [
+        "美团研究院",
+        "美团 Meituan",
+        "美团外卖",
+        "美团外卖推广服务平台",
+        "京东黑板报",
+        "京东研究院",
+        "淘宝闪购设计",
+        "淘宝闪购技术",
+        "京东外卖",
+        "京东秒送",
+    ],
+    "商家端": [
+        "美团外卖商家中心",
+        "美团闪购商家中心",
+        "美团商家中心",
+        "美团商户外卖通",
+        "美团餐饮观察",
+        "美团下沉市场合作城市",
+        "美团外卖智能硬件",
+        "美团餐饮经营宝",
+        "美团餐饮系统",
+        "淘宝闪购商家课堂",
+        "淘宝闪购商家中心",
+        "京东外卖商家中心",
+        "京东秒送商家经营小助手",
+    ],
+    "骑手与即时配送": [
+        "美团骑手",
+        "达达秒送骑士",
+        "达达黑板报",
+        "淘宝闪购城市骑士",
+        "美团闪电仓",
+    ],
+}
+
+ACCOUNT_TERMS = [account for accounts in WECHAT_ACCOUNTS.values() for account in accounts]
+HIGH_SIGNAL_ACCOUNTS = [
+    "晚点LatePost",
+    "36氪未来消费",
+    "创新零售社",
+    "美团研究院",
+    "美团外卖",
+    "美团外卖商家中心",
+    "美团闪购商家中心",
+    "淘宝闪购商家中心",
+    "京东秒送",
+    "京东黑板报",
+    "美团骑手",
+    "达达秒送骑士",
+]
+
+PLATFORM_SEARCH_TERMS = [
+    "小红书 即时零售 闪购 外卖 秒送",
+    "小红书 美团闪购 淘宝闪购 京东秒送",
+    "美团众包骑手APP 新功能",
+    "蜂鸟众包APP 新功能",
+]
+
+MERCHANT_WEB_SOURCES = [
+    {"name": "美团商家外卖课堂", "domain": "collegewm.meituan.com", "focus": "商家培训、经营工具、活动规则", "weight": 8},
+    {"name": "淘宝闪购商家培训", "domain": "alins.ele.me", "focus": "淘宝闪购商家培训、经营规则", "weight": 8},
+]
+
+REPORT_SOURCES = [
+    "华泰证券",
+    "JP Morgan",
+    "Goldman Sachs",
+    "国海证券",
+    "招商海外",
+    "中金证券",
+    "交银国际",
+    "中信证券",
+    "广发证券",
+    "海通证券",
+    "国泰君安证券",
+    "国信证券",
+]
+
+NEWS_SEARCH_CHANNELS = [
+    "新浪新闻",
+    "百度资讯",
+    "Google Alert",
+]
+
+ALL_WEB_SOURCES = DATA_SOURCES + MERCHANT_WEB_SOURCES
+HIGH_SIGNAL_SOURCES = [source for source in ALL_WEB_SOURCES if source["weight"] >= 8]
+SOURCE_LOOKUP = {source["domain"]: source for source in ALL_WEB_SOURCES}
 
 def month_labels() -> list[str]:
     today = datetime.now(CN_TZ)
@@ -108,10 +220,27 @@ def build_queries() -> list[str]:
     source_focus_term = "即时配送 即时零售 闪购 跑腿 秒送 AI 上线"
     for source in HIGH_SIGNAL_SOURCES:
         source_queries.append(f"site:{source['domain']} {source_focus_term}")
+    account_queries = [
+        f"{account} 即时零售 闪购 外卖 跑腿 秒送 AI 上线"
+        for account in HIGH_SIGNAL_ACCOUNTS
+    ]
+    platform_queries = PLATFORM_SEARCH_TERMS
+    report_queries = [
+        f"{broker} 即时零售 外卖 闪购 美团 京东 阿里 研报"
+        for broker in REPORT_SOURCES[:8]
+    ]
+    news_queries = [
+        f"{channel} 即时零售 闪购 跑腿 秒送"
+        for channel in NEWS_SEARCH_CHANNELS
+    ]
     for month in month_labels():
-        for term in broad_terms + platform_terms + source_queries:
+        for term in broad_terms + platform_terms + source_queries + account_queries + platform_queries + report_queries + news_queries:
             queries.append(f"{month} {term}")
     return queries
+
+
+def source_inventory_count() -> int:
+    return len(ALL_WEB_SOURCES) + len(ACCOUNT_TERMS) + len(PLATFORM_SEARCH_TERMS) + len(REPORT_SOURCES) + len(NEWS_SEARCH_CHANNELS)
 
 PLATFORM_HINTS = [
     "淘宝闪购",
@@ -224,10 +353,38 @@ def source_name(url: str) -> str:
     return host or "自动抓取"
 
 
+def account_from_text(text: str) -> str | None:
+    compact = re.sub(r"\s+", "", text)
+    for account in sorted(ACCOUNT_TERMS, key=len, reverse=True):
+        if re.sub(r"\s+", "", account) in compact:
+            return account
+    return None
+
+
+def source_name_from_text(url: str, text: str) -> str:
+    account = account_from_text(text)
+    if account:
+        return account
+    return source_name(url)
+
+
 def source_weight(url: str) -> int:
     for domain, source in SOURCE_LOOKUP.items():
         if domain in url:
             return int(source["weight"])
+    return 0
+
+
+def term_source_weight(text: str) -> int:
+    compact = re.sub(r"\s+", "", text)
+    if any(re.sub(r"\s+", "", account) in compact for account in HIGH_SIGNAL_ACCOUNTS):
+        return 9
+    if any(re.sub(r"\s+", "", account) in compact for account in ACCOUNT_TERMS):
+        return 6
+    if any(term in text for term in PLATFORM_SEARCH_TERMS):
+        return 5
+    if any(source in text for source in REPORT_SOURCES):
+        return 4
     return 0
 
 
@@ -265,7 +422,7 @@ def score_candidate(title: str, summary: str, url: str) -> int:
         score += 6
     if re.search(r"7月|07月|2026-07", text):
         score += 10
-    score += source_weight(url)
+    score += source_weight(url) + term_source_weight(text)
     return max(1, min(score, 99))
 
 
@@ -350,7 +507,7 @@ def parse_bing_rss(xml_text: str) -> list[dict]:
                 "category": category_from_text(text),
                 "summary": description[:180] or "搜索结果未提供摘要，请打开来源复核。",
                 "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
-                "sourceName": source_name(link),
+                "sourceName": source_name_from_text(link, text),
                 "sourceUrl": link,
                 "score": score,
             }
@@ -392,7 +549,7 @@ def parse_so_results(html_text: str) -> list[dict]:
                 "category": category_from_text(text),
                 "summary": description[:180] or "搜索结果未提供摘要，请打开来源复核。",
                 "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
-                "sourceName": source_name(link),
+                "sourceName": source_name_from_text(link, text),
                 "sourceUrl": link,
                 "score": score,
             }
@@ -454,7 +611,7 @@ def inject_candidates(dashboard: Path, candidates: list[dict]) -> None:
     block = (
         "    // AUTO_CANDIDATES_START\n"
         f"    const generatedCandidates = {json.dumps(candidates, ensure_ascii=False, indent=6)};\n"
-        f"    const generatedMeta = {json.dumps({'updatedAt': updated_at, 'sourceCount': len(DATA_SOURCES), 'queryCount': len(build_queries())}, ensure_ascii=False)};\n"
+        f"    const generatedMeta = {json.dumps({'updatedAt': updated_at, 'sourceCount': source_inventory_count(), 'queryCount': len(build_queries())}, ensure_ascii=False)};\n"
         "    // AUTO_CANDIDATES_END"
     )
     pattern = re.compile(
