@@ -911,6 +911,9 @@ def inject_candidates(dashboard: Path, candidates: list[dict]) -> None:
         "updatedAt": updated_at,
         "sourceCount": source_inventory_count(),
         "queryCount": len(build_queries()),
+        "candidateCount": len(candidates),
+        "retentionDays": RECENT_DAYS,
+        "status": "completed",
         "sourceWeights": source_weight_inventory(),
     }
     block = (
