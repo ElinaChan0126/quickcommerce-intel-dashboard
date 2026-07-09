@@ -2,8 +2,10 @@ name: Daily competitor intel update
 
 on:
   schedule:
-    # 09:30 Asia/Shanghai.
+    # 09:30, 14:30, 20:30 Asia/Shanghai.
     - cron: "30 1 * * *"
+    - cron: "30 6 * * *"
+    - cron: "30 12 * * *"
   workflow_dispatch:
 
 permissions:

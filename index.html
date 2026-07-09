@@ -99,11 +99,11 @@
     .candidate-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 16px; }
     .candidate-head h2 { margin-top: 6px; font-size: 22px; }
     .candidate-list { display: grid; gap: 12px; }
-    .crawl-status { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
+    .crawl-status { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
     .crawl-stat { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 12px; }
     .crawl-stat span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; }
     .crawl-stat strong { display: block; margin-top: 5px; font-size: 18px; line-height: 1.2; }
-    .crawl-note { border: 1px dashed var(--line); border-radius: 8px; background: rgba(255,255,255,.74); color: var(--muted); padding: 12px; font-size: 13px; line-height: 1.6; }
+    .crawl-note { grid-column: 1 / -1; border: 1px dashed var(--line); border-radius: 8px; background: rgba(255,255,255,.74); color: var(--muted); padding: 12px; font-size: 13px; line-height: 1.6; }
     .candidate-empty { border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); padding: 18px; line-height: 1.7; }
     .candidate-card { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 16px; }
     .candidate-top { display: flex; justify-content: space-between; gap: 14px; align-items: start; }
@@ -1050,6 +1050,7 @@
         <div class="crawl-stat"><span>检索组合</span><strong>${queries}</strong></div>
         <div class="crawl-stat"><span>抓到候选</span><strong>${total}</strong></div>
         <div class="crawl-stat"><span>待处理</span><strong>${visible}</strong></div>
+        <div class="crawl-stat"><span>抓取频率</span><strong>每日 3 次</strong></div>
         <div class="crawl-note">${note}</div>
       `;
     }
