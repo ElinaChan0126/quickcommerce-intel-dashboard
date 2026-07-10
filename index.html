@@ -84,6 +84,8 @@
     }
     .brief h2 { margin-top: 8px; max-width: 920px; font-size: clamp(24px,3vw,40px); line-height: 1.16; }
     .brief p:last-child { max-width: 930px; margin: 16px 0 0; color: #3b433a; font-size: 16px; line-height: 1.8; }
+    .shell > section { margin-bottom: 24px; }
+    .shell > section:last-of-type { margin-bottom: 0; }
     .signals { display: grid; align-content: center; gap: 18px; border-left: 1px solid var(--line); padding-left: 24px; min-height: 230px; }
     .signal { display: grid; grid-template-columns: 112px minmax(100px,1fr) 48px; gap: 12px; align-items: center; }
     .signal span { color: #3b433a; font-size: 13px; font-weight: 750; }
@@ -91,7 +93,6 @@
     .fill { height: 100%; border-radius: inherit; }
     .signal strong { text-align: right; font-size: 14px; }
     .workspace { display: grid; grid-template-columns: minmax(0,1fr) 380px; gap: 24px; align-items: start; }
-    .workspace + .candidate-board { margin-top: 24px; }
     .board, .panel, .candidate-board { border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.9); box-shadow: var(--shadow); }
     .board { padding: 22px; }
     .panel { padding: 20px; }
@@ -120,7 +121,7 @@
     }
     input:focus, select:focus, textarea:focus, .search:focus-within { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(15,143,124,.14); }
     .list { display: grid; gap: 12px; }
-    .candidate-board { margin-bottom: 24px; padding: 22px; }
+    .candidate-board { padding: 22px; }
     .candidate-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 16px; }
     .candidate-head h2 { margin-top: 6px; font-size: 22px; }
     .candidate-list { display: grid; gap: 12px; }
