@@ -179,6 +179,11 @@
     .inline-edit textarea { min-height: 76px; }
     .inline-edit .edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
     .inline-edit .edit-actions button:first-child { border-color: var(--teal); background: var(--teal); color: #fff; }
+    .candidate-enrich { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 8px; background: #f8faf6; padding: 12px; }
+    .candidate-enrich textarea { min-height: 180px; }
+    .candidate-enrich .edit-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .candidate-enrich .edit-actions button { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); padding: 8px 10px; font-size: 13px; font-weight: 850; }
+    .candidate-enrich .edit-actions button:first-child { border-color: var(--teal); background: var(--teal); color: #fff; }
     .runbook { margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.65; }
     .code-chip { display: inline-block; margin-top: 8px; border-radius: 8px; background: var(--soft); color: #3b433a; padding: 8px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
     @media (max-width: 1100px) {
@@ -262,6 +267,19 @@
       </div>
       <div class="crawl-status collapsible-content" id="crawl-status"></div>
       <div class="candidate-list collapsible-content" id="candidate-list"></div>
+    </section>
+
+    <section class="candidate-board module" aria-label="公众号候选" data-module="wechat-candidates">
+      <div class="candidate-head">
+        <div>
+          <p class="label">公众号候选区</p>
+          <h2>先展示系统能搜到的公众号线索，全文拿不到时可粘贴正文解析</h2>
+        </div>
+        <div class="module-actions">
+          <div class="badge"><span>公众号线索</span><strong id="wechat-candidate-count">0</strong></div>
+        </div>
+      </div>
+      <div class="candidate-list collapsible-content" id="wechat-candidate-list"></div>
     </section>
 
     <section class="candidate-board module" aria-label="回收站" data-module="trash">
@@ -362,6 +380,7 @@
     const sourceWeightOverrideKey = "quick-commerce-intel-source-weight-overrides";
     const itemEditKey = "quick-commerce-intel-item-edits";
     const removedIntelKey = "quick-commerce-intel-removed-items";
+    const candidateEnrichmentKey = "quick-commerce-intel-candidate-enrichments";
     const trashRetentionDays = 30;
     const els = {
       list: document.getElementById("list"),
@@ -400,6 +419,8 @@
     const setItemEdits = edits => localStorage.setItem(itemEditKey, JSON.stringify(edits));
     const getRemovedIntelIds = () => JSON.parse(localStorage.getItem(removedIntelKey) || "[]");
     const setRemovedIntelIds = ids => localStorage.setItem(removedIntelKey, JSON.stringify([...new Set(ids)]));
+    const getCandidateEnrichments = () => JSON.parse(localStorage.getItem(candidateEnrichmentKey) || "{}");
+    const setCandidateEnrichments = values => localStorage.setItem(candidateEnrichmentKey, JSON.stringify(values));
     const applyItemEdits = item => ({ ...item, ...(getItemEdits()[item.id] || {}) });
     const allItems = () => {
       const removed = new Set(getRemovedIntelIds());
@@ -414,6 +435,7 @@
     const currentMonth = () => selectedMonthFrom(els.month);
     const inSelectedMonth = item => currentMonth() === "全部月份" || itemMonth(item) === currentMonth();
     let editingItemId = "";
+    let enrichingCandidateId = "";
     function localDateISO(date = new Date()) {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -594,7 +616,12 @@
       });
       return [...byEvent.values()].sort((a, b) => candidateScore(b) - candidateScore(a));
     }
-    const candidatePool = () => mergeCandidateItems(generatedCandidates);
+    function applyCandidateEnrichment(item) {
+      return { ...item, ...(getCandidateEnrichments()[item.id] || {}) };
+    }
+    const candidatePool = () => mergeCandidateItems(generatedCandidates)
+      .map(applyCandidateEnrichment)
+      .sort((a, b) => candidateScore(b) - candidateScore(a));
     function businessClass(tag) {
       if (tag === "S&R") return "business-sr";
       return `business-${String(tag || "S&R").toLowerCase().replace("&", "r").replace(/[^a-z0-9]/g, "")}`;
@@ -672,6 +699,15 @@
       if (sources.length > 1) return `多来源 ${sources.length} 个`;
       return sources[0]?.name || item.sourceName || "自动抓取";
     }
+    function isWechatCandidate(item) {
+      const text = `${item.sourceKind || ""} ${item.contentStatus || ""} ${item.sourceName || ""} ${item.sourceUrl || ""} ${sourceLabel(item)}`;
+      return text.includes("公众号") || text.includes("mp.weixin.qq.com") || item.needsFullText;
+    }
+    function wechatStatusLabel(item) {
+      if (item.fullTextStatus) return item.fullTextStatus;
+      if (isWechatCandidate(item)) return item.contentStatus || "只读到搜索摘要";
+      return item.contentStatus || "已读摘要";
+    }
     function allMonths() {
       const months = [...allItems(), ...candidatePool()]
         .map(itemMonth)
@@ -717,6 +753,109 @@
             <button data-edit-cancel="${item.id}" type="button">取消</button>
           </div>
         </div>`;
+    }
+    function candidateFullTextPanel(item) {
+      if (enrichingCandidateId !== item.id) return "";
+      return `
+        <div class="candidate-enrich" data-enrich-panel="${item.id}">
+          <label><span>公众号全文</span><textarea data-fulltext-input placeholder="把微信文章正文粘贴到这里，系统会提取事件、摘要、标签和判断">${escapeHtml(item.fullText || "")}</textarea></label>
+          <div class="edit-actions">
+            <button data-fulltext-parse="${item.id}" type="button">解析并更新候选</button>
+            <button data-fulltext-cancel="${item.id}" type="button">取消</button>
+          </div>
+        </div>`;
+    }
+    function cleanPastedFullText(text) {
+      return String(text || "")
+        .replace(/\r/g, "\n")
+        .replace(/[ \t]+/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    }
+    function sentenceList(text) {
+      return cleanPastedFullText(text)
+        .split(/(?<=[。！？!?；;])|\n+/)
+        .map(sentence => sentence.trim())
+        .filter(sentence => sentence.length >= 10 && !["点击", "阅读原文", "微信扫一扫", "分享", "点赞", "在看"].some(word => sentence.includes(word)));
+    }
+    function inferCandidateCategory(text) {
+      const rules = [
+        ["AI入口", ["AI", "智能体", "Agent", "助手", "阿宝", "自然语言", "语音", "Skill"]],
+        ["活动营销", ["活动", "补贴", "优惠", "满减", "红包", "大促", "会场", "低至", "618", "世界杯"]],
+        ["供给履约", ["前置仓", "便利店", "商超", "供给", "履约", "配送", "运力", "时效", "即时配送"]],
+        ["平台治理", ["规则", "治理", "权益", "免罚", "超时", "处罚", "安全"]],
+        ["商家工具", ["商家", "商户", "经营", "服务商", "代运营", "店铺", "培训", "课堂"]]
+      ];
+      return rules.find(([, words]) => words.some(word => text.includes(word)))?.[0] || "待归类";
+    }
+    function inferCandidateType(text, category) {
+      if (category === "AI入口") return "AI 对话入口";
+      if (text.includes("活动") || text.includes("补贴") || text.includes("优惠")) return "活动营销";
+      if (text.includes("规则") || text.includes("权益") || text.includes("免罚")) return "规则/权益";
+      if (text.includes("前置仓") || text.includes("便利店") || text.includes("供给")) return "供给策略";
+      return "公众号解析";
+    }
+    function inferTitleFromFullText(text, item) {
+      const lines = cleanPastedFullText(text).split("\n").map(line => line.trim()).filter(Boolean);
+      const useful = lines.find(line =>
+        line.length >= 8 && line.length <= 64
+        && !["作者", "来源", "微信", "公众号", "点击", "阅读原文", "免责声明"].some(word => line.includes(word))
+      );
+      return useful || item.title;
+    }
+    function summarizeFullText(text, item) {
+      const sentences = sentenceList(text);
+      const important = sentences.filter(sentence =>
+        ["上线", "发布", "接入", "启动", "升级", "开启", "活动", "补贴", "规则", "AI", "下单", "跑腿", "闪购", "即时零售", "秒送", "配送"].some(word => sentence.includes(word))
+      );
+      const selected = (important.length ? important : sentences).slice(0, 2).join("");
+      return (selected || item.summary || "").slice(0, 220);
+    }
+    function judgeFromFullText(text, item, tags, category) {
+      if (tags.includes("Buyer") && category === "AI入口") return "公众号全文显示该动作影响买家入口或下单链路，建议重点复核入口形态、可用城市和履约承接方。";
+      if (tags.includes("Buyer")) return "公众号全文显示该动作与买家侧体验相关，建议复核是否涉及下单路径、价格/时效展示或售后体验变化。";
+      if (tags.includes("Merchant")) return "公众号全文偏商家侧经营或供给建设，建议判断它是否会间接影响买家可得性和履约体验。";
+      if (tags.includes("Driver")) return "公众号全文偏骑手或运力规则，建议关注对时效、供给稳定性和用户履约体验的间接影响。";
+      return item.judge || "已补充公众号全文，建议产品经理复核事件真实性、发布时间和业务影响。";
+    }
+    function parseFullTextForCandidate(item, fullText) {
+      const text = cleanPastedFullText(fullText);
+      const title = inferTitleFromFullText(text, item);
+      const summary = summarizeFullText(text, item);
+      const category = inferCandidateCategory(`${title} ${summary} ${text}`);
+      const type = inferCandidateType(`${title} ${summary} ${text}`, category);
+      const temp = { ...item, title, summary, category, type, judge: `${item.judge || ""} ${text.slice(0, 240)}` };
+      const tags = businessTagsOf(temp);
+      return {
+        title,
+        summary,
+        category,
+        type,
+        businessTags: tags,
+        businessTag: tags[0] || "",
+        judge: judgeFromFullText(text, item, tags, category),
+        fullText: text,
+        fullTextStatus: "已补全文",
+        contentStatus: "已读全文",
+        needsFullText: false,
+        fullTextUpdatedAt: localDateISO()
+      };
+    }
+    function saveCandidateFullText(itemId, panel) {
+      const item = candidatePool().find(candidate => candidate.id === itemId);
+      const input = panel.querySelector("[data-fulltext-input]");
+      const fullText = cleanPastedFullText(input?.value || "");
+      if (!item || fullText.length < 20) return;
+      const parsed = parseFullTextForCandidate(item, fullText);
+      const enrichments = getCandidateEnrichments();
+      enrichments[itemId] = { ...(enrichments[itemId] || {}), ...parsed };
+      setCandidateEnrichments(enrichments);
+      setBusinessTags(itemId, parsed.businessTags);
+      enrichingCandidateId = "";
+      renderFilters();
+      renderCandidates();
+      renderWechatCandidates();
+      renderList();
     }
     function saveItemTextEdit(itemId, panel) {
       const title = panel.querySelector("[data-edit-title]").value.trim();
@@ -875,6 +1014,7 @@
           setBusinessTags(item.id, [...tags]);
           menu.remove();
           renderCandidates();
+          renderWechatCandidates();
           renderTrash();
           renderList();
         });
@@ -899,33 +1039,56 @@
       const list = document.getElementById("candidate-list");
       const updated = document.getElementById("candidate-updated");
       updated.textContent = generatedMeta.updatedAt || "待运行";
-      const candidates = currentCandidates();
-      renderCrawlStatus(candidates);
+      const allCandidates = currentCandidates();
+      const candidates = allCandidates.filter(item => !isWechatCandidate(item));
+      renderCrawlStatus(allCandidates);
       if (!candidates.length) {
         const total = Number(generatedMeta.candidateCount ?? generatedCandidates.length);
-        list.innerHTML = `<div class="candidate-empty">${monthLabel(currentMonth())}暂无未处理候选。${total ? "本次抓取有候选，但当前月份筛选、已入库或回收站规则后没有待处理内容。" : "系统已完成抓取，本次没有检索到新候选。"}</div>`;
+        list.innerHTML = `<div class="candidate-empty">${monthLabel(currentMonth())}暂无未处理的普通网页候选。${total ? "公众号线索会单独展示在下方公众号候选区。" : "系统已完成抓取，本次没有检索到新候选。"}</div>`;
         return;
       }
-      list.innerHTML = candidates.map(item => `
+      list.innerHTML = candidates.map(candidateCardHtml).join("");
+      wireCandidateActions(list);
+      wireTagEditors(list);
+    }
+    function candidateCardHtml(item) {
+      return `
         <article class="candidate-card">
           <div class="candidate-top">
             <div>
-              <p class="platform">${item.platform || "待识别平台"} · ${item.date || "日期待识别"}</p>
-              <h3>${item.title}</h3>
+              <p class="platform">${escapeHtml(item.platform || "待识别平台")} · ${escapeHtml(item.date || "日期待识别")}</p>
+              <h3>${escapeHtml(item.title)}</h3>
             </div>
             <div class="score">${candidateScore(item)}<small>买家侧</small></div>
           </div>
-          <p class="summary">${item.summary}</p>
-          <div class="tags">${businessPill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
+          <p class="summary">${escapeHtml(item.summary)}</p>
+          <div class="tags">${businessPill(item)}<span>${escapeHtml(item.category || "候选")}</span><span>${escapeHtml(sourceLabel(item))}</span>${isWechatCandidate(item) ? `<span>公众号线索</span><span>${escapeHtml(wechatStatusLabel(item))}</span>` : ""}</div>
+          ${candidateFullTextPanel(item)}
           <div class="source-row">
             ${sourceLinks(item)}
             <div class="candidate-actions">
               <button data-accept="${item.id}" type="button">确认入库</button>
+              ${isWechatCandidate(item) ? `<button data-enrich="${item.id}" type="button">${item.fullTextStatus ? "重新解析全文" : "补全文解析"}</button>` : ""}
               <button data-ignore="${item.id}" type="button">忽略</button>
             </div>
           </div>
-        </article>`).join("");
-      list.querySelectorAll("[data-accept]").forEach(button => {
+        </article>`;
+    }
+    function renderWechatCandidates() {
+      const list = document.getElementById("wechat-candidate-list");
+      const count = document.getElementById("wechat-candidate-count");
+      const candidates = currentCandidates().filter(isWechatCandidate);
+      count.textContent = candidates.length;
+      if (!candidates.length) {
+        list.innerHTML = `<div class="candidate-empty">${monthLabel(currentMonth())}暂无公众号候选。系统会继续按目标公众号名和行业关键词自动搜索，搜到后会先放到这里。</div>`;
+        return;
+      }
+      list.innerHTML = candidates.map(candidateCardHtml).join("");
+      wireCandidateActions(list);
+      wireTagEditors(list);
+    }
+    function wireCandidateActions(scope) {
+      scope.querySelectorAll("[data-accept]").forEach(button => {
         button.addEventListener("click", () => {
           const item = candidatePool().find(candidate => candidate.id === button.dataset.accept);
           if (!item) return;
@@ -953,19 +1116,40 @@
           addPurgedIds(itemCandidateIds(item));
           renderFilters();
           renderCandidates();
+          renderWechatCandidates();
           renderTrash();
           renderList();
         });
       });
-      list.querySelectorAll("[data-ignore]").forEach(button => {
+      scope.querySelectorAll("[data-ignore]").forEach(button => {
         button.addEventListener("click", () => {
           const item = candidatePool().find(candidate => candidate.id === button.dataset.ignore);
           if (item) recycleCandidate(item);
           renderCandidates();
+          renderWechatCandidates();
           renderTrash();
         });
       });
-      wireTagEditors(list);
+      scope.querySelectorAll("[data-enrich]").forEach(button => {
+        button.addEventListener("click", () => {
+          enrichingCandidateId = enrichingCandidateId === button.dataset.enrich ? "" : button.dataset.enrich;
+          renderCandidates();
+          renderWechatCandidates();
+        });
+      });
+      scope.querySelectorAll("[data-fulltext-parse]").forEach(button => {
+        button.addEventListener("click", () => {
+          const panel = button.closest("[data-enrich-panel]");
+          if (panel) saveCandidateFullText(button.dataset.fulltextParse, panel);
+        });
+      });
+      scope.querySelectorAll("[data-fulltext-cancel]").forEach(button => {
+        button.addEventListener("click", () => {
+          enrichingCandidateId = "";
+          renderCandidates();
+          renderWechatCandidates();
+        });
+      });
     }
     function renderTrash() {
       const list = document.getElementById("trash-list");
@@ -1003,6 +1187,7 @@
         button.addEventListener("click", () => {
           removeTrashRecord(button.dataset.restore);
           renderCandidates();
+          renderWechatCandidates();
           renderTrash();
         });
       });
@@ -1010,6 +1195,7 @@
         button.addEventListener("click", () => {
           purgeTrashRecord(button.dataset.purge);
           renderCandidates();
+          renderWechatCandidates();
           renderTrash();
         });
       });
@@ -1107,6 +1293,7 @@
       document.getElementById("date").value = "2026-07-08";
       renderFilters();
       renderCandidates();
+      renderWechatCandidates();
       renderList();
     });
     function selectedMonthFrom(select) {
@@ -1121,6 +1308,7 @@
       els.month.selectedIndex = Math.max(0, values.indexOf(selected));
       els.listMonth.selectedIndex = Math.max(0, values.indexOf(selected));
       renderCandidates();
+      renderWechatCandidates();
       renderList();
     }
     function initCollapsibleModules() {
@@ -1180,6 +1368,7 @@
     renderFilters();
     initCollapsibleModules();
     renderCandidates();
+    renderWechatCandidates();
     renderTrash();
     renderSourceWeights();
     renderList();

@@ -224,6 +224,15 @@ def build_queries() -> list[str]:
         f"{account} 即时零售 闪购 外卖 跑腿 秒送 AI 上线"
         for account in HIGH_SIGNAL_ACCOUNTS
     ]
+    wechat_article_queries = [
+        f"site:mp.weixin.qq.com/s {account} {term}"
+        for account in HIGH_SIGNAL_ACCOUNTS
+        for term in [
+            "即时零售 闪购 跑腿 秒送",
+            "外卖 即时配送 新功能 上线",
+            "买家 下单 AI 入口 活动",
+        ]
+    ]
     platform_queries = PLATFORM_SEARCH_TERMS
     report_queries = [
         f"{broker} 即时零售 外卖 闪购 美团 京东 阿里 研报"
@@ -234,7 +243,7 @@ def build_queries() -> list[str]:
         for channel in NEWS_SEARCH_CHANNELS
     ]
     for month in month_labels():
-        for term in broad_terms + platform_terms + source_queries + account_queries + platform_queries + report_queries + news_queries:
+        for term in broad_terms + platform_terms + source_queries + account_queries + wechat_article_queries + platform_queries + report_queries + news_queries:
             queries.append(f"{month} {term}")
     return queries
 
@@ -764,6 +773,7 @@ def make_candidate(title: str, description: str, link: str, pub_date: str = "") 
         return None
     sources = [source_object(link, text)]
     relevance_score, relevance_reason = buyer_relevance(text)
+    is_wechat = "mp.weixin.qq.com" in link
     return {
         "id": candidate_id(link, title),
         "date": parse_date(pub_date, f"{text} {link}"),
@@ -778,6 +788,9 @@ def make_candidate(title: str, description: str, link: str, pub_date: str = "") 
         "sourceName": sources[0]["name"],
         "sourceUrl": link,
         "sources": sources,
+        "sourceKind": "公众号" if is_wechat else "网页",
+        "contentStatus": "只读到搜索摘要" if is_wechat else "已读摘要",
+        "needsFullText": is_wechat,
         "score": score,
         "buyerRelevance": relevance_score,
         "relevanceReason": relevance_reason,
