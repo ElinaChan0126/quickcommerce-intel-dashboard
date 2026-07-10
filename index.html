@@ -1015,9 +1015,6 @@
         els.briefSignals.innerHTML = '<div class="candidate-empty">暂无可统计的事件类别</div>';
         return;
       }
-      const platforms = new Set(items.map(item => item.platform).filter(Boolean));
-      const highPriorityCount = items.filter(item => item.priority === "高").length;
-      const multiSourceCount = items.filter(item => itemSources(item).length > 1).length;
       const categoryCounts = items.reduce((counts, item) => {
         const category = item.category || "待归类";
         counts.set(category, (counts.get(category) || 0) + 1);
@@ -1029,6 +1026,52 @@
         "AI入口": "AI 对话入口",
         "营销活动": "季节 / 赛事营销"
       };
+      function insightForCategory(category) {
+        const categoryItems = items.filter(item => (item.category || "待归类") === category);
+        const text = categoryItems.map(item => `${item.title || ""} ${item.type || ""} ${item.summary || ""}`).join(" ");
+        if (category === "AI入口") {
+          const reachesBuyer = ["用户", "下单", "入口", "支付宝", "语音", "对话", "订单"].some(word => text.includes(word));
+          const reachesMerchant = ["商家", "商户", "服务商", "经营", "代运营", "工作台"].some(word => text.includes(word));
+          if (reachesBuyer && reachesMerchant) return {
+            signal: "AI 同时渗透用户下单与商家经营",
+            focus: "AI 入口对信息填写和下单转化的影响，以及经营工具如何进一步传导到供给质量和履约体验"
+          };
+          if (reachesBuyer) return {
+            signal: "AI 下单入口继续前移",
+            focus: "入口流量归属、信息填写压缩及履约承接方式"
+          };
+          if (reachesMerchant) return {
+            signal: "AI 经营工具加速落地",
+            focus: "商家经营效率的变化，以及它对供给质量和用户体验的传导"
+          };
+          return {
+            signal: "AI 能力加速进入即时配送链路",
+            focus: "AI 功能所在环节及其对用户决策和履约体验的实际影响"
+          };
+        }
+        const knownInsights = {
+          "营销活动": {
+            signal: "场景营销持续加码",
+            focus: "会场入口、智能组套、价格权益与直送承诺"
+          },
+          "供给履约": {
+            signal: "近场供给继续扩张",
+            focus: "供给密度、品类扩展及服务完成标准"
+          },
+          "平台治理": {
+            signal: "平台治理规则趋严",
+            focus: "治理能力能否转化为用户侧的信任表达"
+          },
+          "配送体验": {
+            signal: "配送规则持续调整",
+            focus: "异常场景、超时规则与用户时效承诺的联动"
+          }
+        };
+        return knownInsights[category] || {
+          signal: `${category}相关动作增加`,
+          focus: `${category}对用户决策和履约体验的影响`
+        };
+      }
       const colors = ["var(--teal)", "var(--coral)", "var(--amber)", "var(--blue)", "#7d6ea8", "#637a54"];
       const categoryShares = categories.map(([category, count]) => {
         const rawPercent = count / items.length * 100;
@@ -1039,8 +1082,18 @@
         .sort((a, b) => b.remainder - a.remainder || b.count - a.count || a.category.localeCompare(b.category, "zh-CN"))
         .slice(0, unassignedPoints)
         .forEach(item => { item.percent += 1; });
-      els.briefTitle.textContent = `${period}已入库 ${items.length} 条情报，覆盖 ${platforms.size} 个平台与 ${categories.length} 类事件。`;
-      els.briefSummary.textContent = `其中高优先级 ${highPriorityCount} 条，多来源交叉验证 ${multiSourceCount} 条。右侧占比按事件类别统计，会随月份切换及情报入库、删除、恢复、合并自动更新。`;
+      const insightOrder = ["AI入口", "营销活动", "供给履约", "平台治理", "配送体验"];
+      const insights = categories
+        .map(([category]) => category)
+        .sort((a, b) => {
+          const aIndex = insightOrder.includes(a) ? insightOrder.indexOf(a) : insightOrder.length;
+          const bIndex = insightOrder.includes(b) ? insightOrder.indexOf(b) : insightOrder.length;
+          return aIndex - bIndex || a.localeCompare(b, "zh-CN");
+        })
+        .map(insightForCategory);
+      const periodLead = period === "全部月份" ? "现有线索显示" : `${period}线索显示`;
+      els.briefTitle.textContent = `${periodLead}，${insights.map(item => item.signal).join("、")}。`;
+      els.briefSummary.textContent = `从买家侧看，建议重点关注：${insights.map(item => item.focus).join("；")}。摘要会随月份切换及情报入库、删除、恢复、合并自动更新。`;
       els.briefSignals.innerHTML = categoryShares.map(({ category, count, percent }, index) => {
         const label = categoryLabels[category] || category;
         return `<div class="signal" title="${escapeHtml(label)}：${count} 条，占当月已入库事件 ${percent}%">
