@@ -1010,6 +1010,9 @@
         <div class="inline-edit" data-edit-panel="${item.id}">
           <label><span>标题</span><input data-edit-title value="${escapeHtml(item.title)}" /></label>
           <label><span>内容简介</span><textarea data-edit-summary>${escapeHtml(item.summary)}</textarea></label>
+          <label><span>核验状态</span><select data-edit-status>
+            ${["已核验", "待复核", "7月追踪"].map(status => `<option ${item.status === status ? "selected" : ""}>${status}</option>`).join("")}
+          </select></label>
           <div class="edit-actions">
             <button data-edit-save="${item.id}" type="button">保存</button>
             <button data-edit-cancel="${item.id}" type="button">取消</button>
@@ -1121,9 +1124,10 @@
     function saveItemTextEdit(itemId, panel) {
       const title = panel.querySelector("[data-edit-title]").value.trim();
       const summary = panel.querySelector("[data-edit-summary]").value.trim();
+      const status = panel.querySelector("[data-edit-status]").value;
       if (!title || !summary) return;
       const edits = getItemEdits();
-      edits[itemId] = { ...(edits[itemId] || {}), title, summary };
+      edits[itemId] = { ...(edits[itemId] || {}), title, summary, status };
       setItemEdits(edits);
       editingItemId = "";
       renderList();
