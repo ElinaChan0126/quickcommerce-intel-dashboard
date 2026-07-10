@@ -310,15 +310,10 @@
       <div class="collapsible-content" style="display: contents;">
         <div>
           <p class="label">今日摘要</p>
-          <h2>AI 入口、夏日场景和配送规则，是本轮最值得盯的三条线。</h2>
-          <p>6 月主线集中在淘宝闪购的夏季即时零售和 B 端 AI 工具、京东秒送的赛事夜宵组套、顺丰同城的骑手规则协商。7 月初顺丰接入支付宝 AI 生态，建议作为延续动作单独追踪。</p>
+          <h2 id="brief-title">正在汇总已入库情报...</h2>
+          <p id="brief-summary">摘要会按照当前所选月份自动更新。</p>
         </div>
-        <div class="signals" aria-label="竞品动向分布">
-          <div class="signal"><span>AI 对话入口</span><div class="track"><div class="fill" style="width:74%;background:var(--teal)"></div></div><strong>31%</strong></div>
-          <div class="signal"><span>季节/赛事营销</span><div class="track"><div class="fill" style="width:67%;background:var(--coral)"></div></div><strong>28%</strong></div>
-          <div class="signal"><span>平台治理</span><div class="track"><div class="fill" style="width:53%;background:var(--amber)"></div></div><strong>22%</strong></div>
-          <div class="signal"><span>供给履约</span><div class="track"><div class="fill" style="width:46%;background:var(--blue)"></div></div><strong>19%</strong></div>
-        </div>
+        <div class="signals" id="brief-signals" aria-label="当前月份事件类别占比"></div>
       </div>
     </section>
 
@@ -584,6 +579,9 @@
       mergeForm: document.getElementById("merge-form"),
       mergePrimaryOptions: document.getElementById("merge-primary-options"),
       mergeSourcePreview: document.getElementById("merge-source-preview"),
+      briefTitle: document.getElementById("brief-title"),
+      briefSummary: document.getElementById("brief-summary"),
+      briefSignals: document.getElementById("brief-signals"),
       form: document.getElementById("capture-form")
     };
     const businessTags = ["Buyer", "Promo", "Merchant", "Driver", "S&R"];
@@ -1007,6 +1005,50 @@
       const sources = itemSources(item);
       if (sources.length > 1) return `多来源 ${sources.length} 个`;
       return sources[0]?.name || item.sourceName || "自动抓取";
+    }
+    function renderBrief() {
+      const items = allItems().filter(inSelectedMonth);
+      const period = monthLabel(currentMonth());
+      if (!items.length) {
+        els.briefTitle.textContent = `${period}暂无已入库情报`;
+        els.briefSummary.textContent = "候选情报确认入库后，这里会自动生成当月摘要和事件类别占比。";
+        els.briefSignals.innerHTML = '<div class="candidate-empty">暂无可统计的事件类别</div>';
+        return;
+      }
+      const platforms = new Set(items.map(item => item.platform).filter(Boolean));
+      const highPriorityCount = items.filter(item => item.priority === "高").length;
+      const multiSourceCount = items.filter(item => itemSources(item).length > 1).length;
+      const categoryCounts = items.reduce((counts, item) => {
+        const category = item.category || "待归类";
+        counts.set(category, (counts.get(category) || 0) + 1);
+        return counts;
+      }, new Map());
+      const categories = [...categoryCounts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh-CN"));
+      const categoryLabels = {
+        "AI入口": "AI 对话入口",
+        "营销活动": "季节 / 赛事营销"
+      };
+      const colors = ["var(--teal)", "var(--coral)", "var(--amber)", "var(--blue)", "#7d6ea8", "#637a54"];
+      const categoryShares = categories.map(([category, count]) => {
+        const rawPercent = count / items.length * 100;
+        return { category, count, percent: Math.floor(rawPercent), remainder: rawPercent % 1 };
+      });
+      const unassignedPoints = 100 - categoryShares.reduce((sum, item) => sum + item.percent, 0);
+      [...categoryShares]
+        .sort((a, b) => b.remainder - a.remainder || b.count - a.count || a.category.localeCompare(b.category, "zh-CN"))
+        .slice(0, unassignedPoints)
+        .forEach(item => { item.percent += 1; });
+      els.briefTitle.textContent = `${period}已入库 ${items.length} 条情报，覆盖 ${platforms.size} 个平台与 ${categories.length} 类事件。`;
+      els.briefSummary.textContent = `其中高优先级 ${highPriorityCount} 条，多来源交叉验证 ${multiSourceCount} 条。右侧占比按事件类别统计，会随月份切换及情报入库、删除、恢复、合并自动更新。`;
+      els.briefSignals.innerHTML = categoryShares.map(({ category, count, percent }, index) => {
+        const label = categoryLabels[category] || category;
+        return `<div class="signal" title="${escapeHtml(label)}：${count} 条，占当月已入库事件 ${percent}%">
+          <span>${escapeHtml(label)}</span>
+          <div class="track" role="img" aria-label="${escapeHtml(label)} ${count} 条，占比 ${percent}%"><div class="fill" style="width:${percent}%;background:${colors[index % colors.length]}"></div></div>
+          <strong>${percent}%</strong>
+        </div>`;
+      }).join("");
     }
     function isWechatCandidate(item) {
       const text = `${item.sourceKind || ""} ${item.contentStatus || ""} ${item.sourceName || ""} ${item.sourceUrl || ""} ${sourceLabel(item)}`;
@@ -1533,6 +1575,7 @@
       wireTagEditors(list);
     }
     function renderList() {
+      renderBrief();
       const q = els.search.value.trim().toLowerCase();
       const platform = els.platform.value || "全部平台";
       const business = els.business.value || "全部标签";
