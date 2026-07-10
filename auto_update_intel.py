@@ -469,11 +469,25 @@ def fetch(url: str, timeout: int = 18) -> str:
         return response.read().decode("utf-8", "ignore")
 
 
+def decode_js_string(value: str) -> str:
+    value = value.strip().strip(";")
+    if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+        value = value[1:-1]
+    if "\\" in value:
+        value = value.encode("utf-8").decode("unicode_escape", "ignore")
+    return html.unescape(value).strip()
+
+
 def clean_text(value: str) -> str:
     value = html.unescape(value or "")
     value = re.sub(r"<[^>]+>", " ", value)
     value = re.sub(r"\s+", " ", value).strip()
     return value
+
+
+def wechat_query_worthy(query: str) -> bool:
+    compact = re.sub(r"\s+", "", query)
+    return "mp.weixin.qq.com" in query or any(re.sub(r"\s+", "", account) in compact for account in HIGH_SIGNAL_ACCOUNTS)
 
 
 def source_object(url: str, text: str) -> dict:
@@ -806,6 +820,66 @@ def candidates_from_result(title: str, description: str, link: str, pub_date: st
     return candidates
 
 
+def parse_wechat_article_meta(html_text: str, url: str) -> dict | None:
+    def js_value(name: str) -> str:
+        match = re.search(rf"var\s+{name}\s*=\s*([\"'].*?[\"']);", html_text, flags=re.S)
+        return decode_js_string(match.group(1)) if match else ""
+
+    title = clean_text(js_value("msg_title"))
+    account = clean_text(js_value("nickname"))
+    description = clean_text(js_value("msg_desc"))
+    content_match = re.search(r'id="js_content"[^>]*>(.*?)</div>\s*<script', html_text, flags=re.S)
+    content = clean_text(content_match.group(1)) if content_match else ""
+    publish = ""
+    ct_match = re.search(r"var\s+ct\s*=\s*['\"]?(\d{9,})", html_text)
+    if ct_match:
+        publish = datetime.fromtimestamp(int(ct_match.group(1)), CN_TZ).date().isoformat()
+    if not title:
+        return None
+    summary = description or content[:220] or "公众号原文可访问，但未提取到摘要。"
+    return {
+        "title": title,
+        "summary": summary,
+        "account": account or "公众号",
+        "date": publish,
+        "content": content[:600],
+        "url": url,
+    }
+
+
+def enrich_wechat_candidate(candidate: dict) -> dict:
+    if "mp.weixin.qq.com" not in candidate.get("sourceUrl", ""):
+        return candidate
+    try:
+        meta = parse_wechat_article_meta(fetch(candidate["sourceUrl"], timeout=10), candidate["sourceUrl"])
+    except Exception as exc:
+        candidate["contentStatus"] = "原文读取受限，仅保留搜索摘要"
+        candidate["needsFullText"] = True
+        candidate["fetchNote"] = f"公众号原文读取失败：{type(exc).__name__}"
+        return candidate
+    if not meta:
+        candidate["contentStatus"] = "原文未提取到标题，仅保留搜索摘要"
+        candidate["needsFullText"] = True
+        return candidate
+    text = f"{meta['account']} {meta['title']} {meta['summary']} {meta.get('content', '')}"
+    candidate.update({
+        "title": meta["title"],
+        "summary": meta["summary"][:220],
+        "date": meta["date"] or candidate.get("date"),
+        "platform": platform_from_text(text),
+        "category": category_from_text(text),
+        "businessTag": business_tag_from_text(text),
+        "businessTags": business_tags_from_text(text),
+        "sourceName": meta["account"],
+        "contentStatus": "已读原文元信息",
+        "needsFullText": False,
+    })
+    candidate["sources"] = [source_object(candidate["sourceUrl"], text)]
+    candidate["buyerRelevance"], candidate["relevanceReason"] = buyer_relevance(text)
+    candidate["score"] = max(candidate.get("score", 0), score_candidate(meta["title"], meta["summary"], candidate["sourceUrl"]))
+    return candidate
+
+
 def merge_candidates(candidates: list[dict]) -> list[dict]:
     merged: list[dict] = []
     index: dict[str, dict] = {}
@@ -875,6 +949,31 @@ def parse_so_results(html_text: str) -> list[dict]:
     return candidates
 
 
+def parse_sogou_weixin_results(html_text: str) -> list[dict]:
+    candidates = []
+    blocks = re.findall(r'<li[^>]+id="sogou_vr_.*?</li>', html_text, flags=re.S)
+    if not blocks:
+        blocks = re.findall(r'<li[^>]*>.*?</li>', html_text, flags=re.S)
+    for block in blocks:
+        title_match = re.search(r'<h3[^>]*>.*?<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>.*?</h3>', block, flags=re.S)
+        if not title_match:
+            continue
+        raw_link = html.unescape(title_match.group(1))
+        if raw_link.startswith("/"):
+            raw_link = "https://weixin.sogou.com" + raw_link
+        title = clean_text(title_match.group(2))
+        account_match = re.search(r'<a[^>]+uigs="account_name_[^"]*"[^>]*>(.*?)</a>', block, flags=re.S)
+        account = clean_text(account_match.group(1)) if account_match else ""
+        desc_match = re.search(r'<p[^>]+class="txt-info"[^>]*>(.*?)</p>', block, flags=re.S)
+        description = clean_text(desc_match.group(1)) if desc_match else ""
+        date_match = re.search(r'(\d{4}-\d{1,2}-\d{1,2})', block)
+        pub_date = date_match.group(1) if date_match else ""
+        text = f"{account} {description}".strip()
+        if title and raw_link:
+            candidates.extend(candidates_from_result(title, text, raw_link, pub_date))
+    return candidates
+
+
 def collect_candidates() -> list[dict]:
     seen = set()
     collected = []
@@ -885,16 +984,22 @@ def collect_candidates() -> list[dict]:
             ("bing", "https://www.bing.com/search?format=rss&q=" + quote(query)),
             ("so", "https://www.so.com/s?q=" + quote(query)),
         ]
+        if wechat_query_worthy(query):
+            urls.append(("sogou_weixin", "https://weixin.sogou.com/weixin?type=2&query=" + quote(query.replace("site:mp.weixin.qq.com/s", ""))))
         for engine, url in urls:
             try:
                 body = fetch(url)
                 if engine == "bing":
                     candidates.extend(parse_bing_rss(body))
-                else:
+                elif engine == "so":
                     candidates.extend(parse_so_results(body))
+                else:
+                    candidates.extend(parse_sogou_weixin_results(body))
             except Exception as exc:  # keep the daily job resilient
                 print(f"[warn] {engine} {query}: {exc}")
         for candidate in candidates:
+            if "mp.weixin.qq.com" in candidate.get("sourceUrl", "") and candidate.get("score", 0) >= 60:
+                candidate = enrich_wechat_candidate(candidate)
             today = datetime.now(CN_TZ).date().isoformat()
             if candidate["date"] == today and candidate["score"] >= 80:
                 actual_date = source_date(candidate["sourceUrl"])
