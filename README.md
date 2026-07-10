@@ -19,7 +19,7 @@
 - 页面 UI 优化：修改 `index.html`。
 - 抓取范围优化：修改 `auto_update_intel.py` 里的平台词、关键词、`DATA_SOURCES` 数据源池。
 - 自动更新时间调整：修改 `.github/workflows/daily-update.yml` 的 `cron` 配置。
-- 本地抓取单篇公众号：在 macOS 终端运行 `scripts/run-wechat-scrape.sh <公众号文章链接>`。脚本会调用本机 Google Chrome，输出 JSON 和 Markdown 到 `wechat-articles/`。
+- 本地抓取单篇公众号：在 macOS 终端运行 `scripts/run-wechat-scrape.sh <公众号文章链接>`。脚本会调用本机 Google Chrome 读取正文，并把文章拆成事件候选写入页面的“公众号候选区”。
 
 自动抓取只进入“候选池”，仍建议由产品经理人工确认后再入库。
 
@@ -28,7 +28,7 @@
 公众号文章抓取分两层：
 
 - GitHub Actions 自动抓取：使用 Bing、360 和搜狗微信公开搜索发现公众号文章标题、链接和摘要；对能直接访问的 `mp.weixin.qq.com` 链接尝试提取元信息。
-- 本地 Chrome 抓取：`scripts/scrape-wechat-chrome.cjs` 会启动你电脑上的 Google Chrome，等待页面渲染后读取 `#js_content`。这更接近人工打开微信文章，成功率通常高于云端请求，但仍可能遇到微信访问限制。
+- 本地 Chrome 抓取：`scripts/scrape-wechat-chrome.cjs` 会启动你电脑上的 Google Chrome，等待页面渲染后读取 `#js_content`，再把正文转换成候选事件并注入 `index.html`。这更接近人工打开微信文章，成功率通常高于云端请求，但仍可能遇到微信访问限制。
 
 示例：
 
@@ -44,6 +44,12 @@ PUPPETEER_EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google
 ```
 
 如果在 Codex 内运行时报 `Chrome remote debugging port did not become ready`，通常是桌面沙箱拦截了 Chrome 的本地权限。可以打开 macOS 自带“终端”，进入仓库目录后运行同一条命令。
+
+默认不会生成 JSON/Markdown 文件。如果需要调试原始抓取结果，可以追加：
+
+```bash
+scripts/run-wechat-scrape.sh https://mp.weixin.qq.com/s/xxxx --save-files
+```
 
 ## 候选去重与合并
 

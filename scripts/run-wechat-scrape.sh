@@ -8,6 +8,7 @@ if [[ -z "$URL" ]]; then
   echo "Usage: scripts/run-wechat-scrape.sh https://mp.weixin.qq.com/s/xxxx"
   exit 1
 fi
+shift || true
 
 if command -v node >/dev/null 2>&1; then
   NODE_BIN="$(command -v node)"
@@ -21,4 +22,4 @@ if [[ ! -x "$NODE_BIN" ]]; then
 fi
 
 cd "$ROOT_DIR"
-"$NODE_BIN" scripts/scrape-wechat-chrome.cjs --url "$URL"
+"$NODE_BIN" scripts/scrape-wechat-chrome.cjs --url "$URL" "$@"
