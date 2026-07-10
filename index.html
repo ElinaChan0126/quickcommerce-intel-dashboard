@@ -78,6 +78,19 @@
     .brief.module { padding-top: 64px; }
     .module-title { display: flex; justify-content: space-between; gap: 16px; align-items: start; margin-bottom: 16px; }
     .module-title h2 { margin-top: 6px; font-size: 22px; }
+    .metric-section { padding-top: 4px; }
+    .metrics { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
+    .metric-card {
+      position: relative; min-height: 138px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px;
+      background: rgba(255,255,255,.9); box-shadow: var(--shadow); padding: 18px 20px;
+    }
+    .metric-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: var(--teal); }
+    .metric-buyer::before { background: var(--blue); }
+    .metric-pending::before { background: var(--amber); }
+    .metric-label { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; color: var(--muted); font-size: 12px; font-weight: 850; }
+    .metric-label small { color: #90988e; font-size: 11px; font-weight: 750; }
+    .metric-card > strong { display: block; margin-top: 12px; font-size: 36px; line-height: 1; }
+    .metric-card p { margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
     .brief {
       display: grid; grid-template-columns: minmax(0,1.35fr) minmax(340px,.65fr); gap: 24px;
       padding: 28px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.9); box-shadow: var(--shadow);
@@ -269,6 +282,9 @@
       .merge-choice { justify-self: end; }
       .signal { grid-template-columns: 100px minmax(90px,1fr) 42px; }
     }
+    @media (max-width: 680px) {
+      .metrics { grid-template-columns: 1fr; }
+    }
     @media (max-width: 520px) {
       .brief h2 { font-size: 24px; }
       .title-row { flex-direction: column; }
@@ -291,10 +307,11 @@
     <nav class="side-nav" aria-label="页面导航">
       <span class="side-nav-title">页面导航</span>
       <div class="side-nav-list">
-        <a class="is-active" href="#brief" data-nav-target="brief" aria-current="location"><span class="side-nav-index">01</span><span>今日摘要</span></a>
-        <a href="#candidates" data-nav-target="candidates"><span class="side-nav-index">02</span><span>候选池</span></a>
-        <a href="#intel-workspace" data-nav-target="intel-workspace"><span class="side-nav-index">03</span><span>情报工作区</span></a>
-        <a href="#trash" data-nav-target="trash"><span class="side-nav-index">04</span><span>回收站</span></a>
+        <a class="is-active" href="#metrics" data-nav-target="metrics" aria-current="location"><span class="side-nav-index">01</span><span>核心指标</span></a>
+        <a href="#brief" data-nav-target="brief"><span class="side-nav-index">02</span><span>今日摘要</span></a>
+        <a href="#candidates" data-nav-target="candidates"><span class="side-nav-index">03</span><span>候选池</span></a>
+        <a href="#intel-workspace" data-nav-target="intel-workspace"><span class="side-nav-index">04</span><span>情报工作区</span></a>
+        <a href="#trash" data-nav-target="trash"><span class="side-nav-index">05</span><span>回收站</span></a>
       </div>
     </nav>
 
@@ -305,6 +322,32 @@
         <button class="module-toggle" id="collapse-all" type="button">全部收起</button>
       </div>
     </div>
+
+    <section class="metric-section module" id="metrics" data-module="metrics">
+      <div class="module-title">
+        <div>
+          <p class="label">核心指标</p>
+          <h2>当前月份的收集量、业务价值与待办</h2>
+        </div>
+      </div>
+      <div class="metrics collapsible-content" aria-live="polite">
+        <article class="metric-card metric-total">
+          <div class="metric-label"><span id="metric-period-label">本月线索</span><small>情报 + 候选</small></div>
+          <strong id="metric-total">0</strong>
+          <p id="metric-total-detail">按事件去重统计</p>
+        </article>
+        <article class="metric-card metric-buyer">
+          <div class="metric-label"><span>买家侧有效情报</span><small>正式入库</small></div>
+          <strong id="metric-buyer">0</strong>
+          <p id="metric-buyer-detail">统计含 Buyer 标签的正式情报</p>
+        </article>
+        <article class="metric-card metric-pending">
+          <div class="metric-label"><span>待处理候选</span><small>当前待办</small></div>
+          <strong id="metric-pending">0</strong>
+          <p id="metric-pending-detail">确认入库或忽略后自动减少</p>
+        </article>
+      </div>
+    </section>
 
     <section class="brief module" id="brief" data-module="brief">
       <div class="collapsible-content" style="display: contents;">
@@ -582,6 +625,13 @@
       briefTitle: document.getElementById("brief-title"),
       briefSummary: document.getElementById("brief-summary"),
       briefSignals: document.getElementById("brief-signals"),
+      metricPeriodLabel: document.getElementById("metric-period-label"),
+      metricTotal: document.getElementById("metric-total"),
+      metricTotalDetail: document.getElementById("metric-total-detail"),
+      metricBuyer: document.getElementById("metric-buyer"),
+      metricBuyerDetail: document.getElementById("metric-buyer-detail"),
+      metricPending: document.getElementById("metric-pending"),
+      metricPendingDetail: document.getElementById("metric-pending-detail"),
       form: document.getElementById("capture-form")
     };
     const businessTags = ["Buyer", "Promo", "Merchant", "Driver", "S&R"];
@@ -1329,6 +1379,27 @@
         .filter(inSelectedMonth)
         .sort((a, b) => candidateScore(b) - candidateScore(a));
     }
+    function renderMetrics(candidates = currentCandidates()) {
+      const intel = allItems().filter(inSelectedMonth);
+      const combined = [...intel, ...candidates];
+      const uniqueEvents = new Set(combined.map(eventKey));
+      const platforms = new Set(combined.map(eventPlatform).filter(Boolean));
+      const buyerIntel = intel.filter(item => businessTagsOf(item).includes("Buyer"));
+      const highPriorityBuyer = buyerIntel.filter(item => item.priority === "高").length;
+      const wechatCandidates = candidates.filter(isWechatCandidate).length;
+      const otherCandidates = candidates.length - wechatCandidates;
+      const selected = currentMonth();
+      const selectedLabel = selected === "全部月份"
+        ? "全部线索"
+        : selected === localDateISO().slice(0, 7) ? "本月线索" : `${monthLabel(selected)}线索`;
+      els.metricPeriodLabel.textContent = selectedLabel;
+      els.metricTotal.textContent = uniqueEvents.size;
+      els.metricTotalDetail.textContent = `按事件去重；正式情报 ${intel.length} 条，候选 ${candidates.length} 条，涉及 ${platforms.size} 个平台`;
+      els.metricBuyer.textContent = buyerIntel.length;
+      els.metricBuyerDetail.textContent = `正式情报中含 Buyer 标签；其中高优先级 ${highPriorityBuyer} 条`;
+      els.metricPending.textContent = candidates.length;
+      els.metricPendingDetail.textContent = `公众号 ${wechatCandidates} 条，网页及其他来源 ${otherCandidates} 条`;
+    }
     function renderCrawlStatus(candidates) {
       const status = document.getElementById("crawl-status");
       const total = Number(generatedMeta.candidateCount ?? generatedCandidates.length);
@@ -1484,6 +1555,7 @@
       const updated = document.getElementById("candidate-updated");
       updated.textContent = generatedMeta.updatedAt || "待运行";
       const candidates = currentCandidates();
+      renderMetrics(candidates);
       renderCrawlStatus(candidates);
       if (!candidates.length) {
         list.innerHTML = `<div class="candidate-empty">${monthLabel(currentMonth())}暂无未处理候选。系统已完成抓取，本次没有检索到新的网页或公众号线索。</div>`;
@@ -1629,6 +1701,7 @@
     }
     function renderList() {
       renderBrief();
+      renderMetrics();
       const q = els.search.value.trim().toLowerCase();
       const platform = els.platform.value || "全部平台";
       const business = els.business.value || "全部标签";
