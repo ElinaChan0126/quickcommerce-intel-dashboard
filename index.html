@@ -301,14 +301,13 @@
         <h1>每日竞品动态汇总</h1>
         </div>
       </div>
-      <div class="badge"><span>最近更新</span><strong>2026-07-08</strong></div>
     </header>
 
     <nav class="side-nav" aria-label="页面导航">
       <span class="side-nav-title">页面导航</span>
       <div class="side-nav-list">
-        <a class="is-active" href="#metrics" data-nav-target="metrics" aria-current="location"><span class="side-nav-index">01</span><span>核心指标</span></a>
-        <a href="#brief" data-nav-target="brief"><span class="side-nav-index">02</span><span>今日摘要</span></a>
+        <a class="is-active" href="#brief" data-nav-target="brief" aria-current="location"><span class="side-nav-index">01</span><span>今日摘要</span></a>
+        <a href="#metrics" data-nav-target="metrics"><span class="side-nav-index">02</span><span>核心指标</span></a>
         <a href="#candidates" data-nav-target="candidates"><span class="side-nav-index">03</span><span>候选池</span></a>
         <a href="#intel-workspace" data-nav-target="intel-workspace"><span class="side-nav-index">04</span><span>情报工作区</span></a>
         <a href="#trash" data-nav-target="trash"><span class="side-nav-index">05</span><span>回收站</span></a>
@@ -322,6 +321,17 @@
         <button class="module-toggle" id="collapse-all" type="button">全部收起</button>
       </div>
     </div>
+
+    <section class="brief module" id="brief" data-module="brief">
+      <div class="collapsible-content" style="display: contents;">
+        <div>
+          <p class="label">今日摘要</p>
+          <h2 id="brief-title">正在汇总已入库情报...</h2>
+          <p id="brief-summary">摘要会按照当前所选月份自动更新。</p>
+        </div>
+        <div class="signals" id="brief-signals" aria-label="当前月份事件类别占比"></div>
+      </div>
+    </section>
 
     <section class="metric-section module" id="metrics" data-module="metrics">
       <div class="module-title">
@@ -346,17 +356,6 @@
           <strong id="metric-pending">0</strong>
           <p id="metric-pending-detail">确认入库或忽略后自动减少</p>
         </article>
-      </div>
-    </section>
-
-    <section class="brief module" id="brief" data-module="brief">
-      <div class="collapsible-content" style="display: contents;">
-        <div>
-          <p class="label">今日摘要</p>
-          <h2 id="brief-title">正在汇总已入库情报...</h2>
-          <p id="brief-summary">摘要会按照当前所选月份自动更新。</p>
-        </div>
-        <div class="signals" id="brief-signals" aria-label="当前月份事件类别占比"></div>
       </div>
     </section>
 
