@@ -74,7 +74,7 @@
     .track { height: 10px; border-radius: 999px; overflow: hidden; background: #dce4d7; }
     .fill { height: 100%; border-radius: inherit; }
     .signal strong { text-align: right; font-size: 14px; }
-    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; margin: 18px 0 24px; }
+    .metrics { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; margin: 18px 0 24px; }
     .metric { min-height: 132px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.86); padding: 18px; }
     .metric strong { display: block; margin-top: 14px; font-size: 42px; line-height: 1; }
     .metric p { margin: 12px 0 0; color: var(--muted); font-size: 13px; }
@@ -87,7 +87,7 @@
     .search { display: flex; align-items: center; gap: 10px; width: min(360px,100%); height: 44px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 0 12px; }
     .search svg, .primary svg { width: 18px; height: 18px; fill: currentColor; flex: 0 0 auto; }
     .search input { width: 100%; border: 0; outline: 0; background: transparent; }
-    .filters { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 12px; margin: 18px 0; }
+    .filters { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin: 18px 0; }
     .merge-toolbar {
       display: flex; justify-content: space-between; gap: 14px; align-items: center;
       margin: -2px 0 16px; border: 1px solid var(--line); border-radius: 8px; background: #f8faf6; padding: 10px 12px;
@@ -137,8 +137,6 @@
     .platform { margin: 0 0 4px; color: var(--teal); font-size: 13px; font-weight: 850; }
     .title-row h3 { font-size: 19px; line-height: 1.35; }
     .title-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-    .pill { flex: 0 0 auto; border-radius: 999px; background: #e3ebf7; color: #214f86; padding: 7px 10px; font-size: 12px; font-weight: 850; }
-    .pill.pending { background: #f7ecd2; color: #835806; }
     .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     .tags span, .tags button { border: 1px solid var(--line); border-radius: 999px; background: var(--soft); color: #3b433a; padding: 6px 9px; font-size: 12px; font-weight: 750; }
     .tags button { cursor: pointer; }
@@ -189,10 +187,6 @@
       border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); padding: 8px 10px; font-size: 13px; font-weight: 850;
     }
     .title-actions button { color: var(--teal); }
-    .title-actions .status-action {
-      border: 0; border-radius: 999px; background: #f7ecd2; color: #835806; padding: 7px 10px; cursor: pointer;
-    }
-    .title-actions .status-action:focus-visible { outline: 3px solid rgba(217,119,6,.2); outline-offset: 2px; }
     .edit-row-actions button { color: var(--teal); }
     .inline-edit { display: grid; gap: 10px; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 12px; }
     .inline-edit textarea { min-height: 76px; }
@@ -249,7 +243,6 @@
     @media (max-width: 520px) {
       .brief h2 { font-size: 24px; }
       .title-row { flex-direction: column; }
-      .pill { width: fit-content; }
     }
   </style>
 </head>
@@ -294,7 +287,6 @@
       <article class="metric collapsible-content"><span id="metric-month-label">当前月份条目</span><strong id="metric-june">0</strong><p>按上方月份筛选统计</p></article>
       <article class="metric collapsible-content"><span>高优先级信号</span><strong id="metric-high">0</strong><p>建议日报重点讨论</p></article>
       <article class="metric collapsible-content"><span>AI 相关动作</span><strong id="metric-ai">0</strong><p>按当前月份统计</p></article>
-      <article class="metric collapsible-content"><span>待复核线索</span><strong id="metric-review">0</strong><p>需要二次查证</p></article>
     </section>
 
     <section class="candidate-board module" aria-label="自动抓取候选" data-module="candidates">
@@ -315,7 +307,7 @@
       <div class="candidate-head">
         <div>
           <p class="label">回收站</p>
-          <h2>忽略的候选会在这里保留 30 天，可恢复或彻底删除</h2>
+          <h2>删除或忽略的情报会保留 30 天，可恢复或彻底删除</h2>
         </div>
         <div class="module-actions">
           <div class="badge"><span>回收站条目</span><strong id="trash-count">0</strong></div>
@@ -327,7 +319,7 @@
     <section class="workspace">
       <div class="board module" data-module="intel-list">
         <div class="board-head">
-          <div><p class="label">情报列表</p><h2>按平台、类型和状态筛选</h2></div>
+          <div><p class="label">情报列表</p><h2>按平台、标签和类型筛选</h2></div>
           <div class="search">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10.8 18.6a7.8 7.8 0 1 1 5.5-2.3l4 4-1.4 1.4-4-4a7.8 7.8 0 0 1-4.1 1.1Zm0-2a5.8 5.8 0 1 0 0-11.6 5.8 5.8 0 0 0 0 11.6Z"/></svg>
             <input id="search" placeholder="搜索平台、标题、判断" />
@@ -338,7 +330,6 @@
           <label><span>平台</span><select id="platform"></select></label>
           <label><span>业务标签</span><select id="business"></select></label>
           <label><span>类型</span><select id="category"></select></label>
-          <label><span>状态</span><select id="status"></select></label>
         </div>
         <div class="merge-toolbar collapsible-content" id="merge-toolbar">
           <div class="merge-toolbar-status"><span>事件合并</span><strong id="merge-selection-count">已选 0/2</strong></div>
@@ -548,7 +539,6 @@
       platform: document.getElementById("platform"),
       business: document.getElementById("business"),
       category: document.getElementById("category"),
-      status: document.getElementById("status"),
       newBusiness: document.getElementById("new-business"),
       newCategory: document.getElementById("new-category"),
       sourceWeightSearch: document.getElementById("source-weight-search"),
@@ -640,13 +630,18 @@
     }
     function normalizeTrashRecord(entry) {
       if (typeof entry === "string") {
-        return { id: entry, candidateIds: [entry], deletedAt: localDateISO(), item: null };
+        return { id: entry, kind: "candidate", origin: "candidate", originalItemId: entry, candidateIds: [entry], deletedAt: localDateISO(), item: null };
       }
       const item = entry.item || null;
       const id = entry.id || item?.id;
+      const kind = entry.kind || "candidate";
+      const originalItemId = entry.originalItemId || item?.id || id;
       return {
         id,
-        candidateIds: [...new Set([id, ...((entry.candidateIds || item?.candidateIds || []))].filter(Boolean))],
+        kind,
+        origin: entry.origin || (kind === "intel" ? "custom" : "candidate"),
+        originalItemId,
+        candidateIds: kind === "intel" ? [] : [...new Set([id, ...((entry.candidateIds || item?.candidateIds || []))].filter(Boolean))],
         deletedAt: entry.deletedAt || localDateISO(),
         item
       };
@@ -1011,7 +1006,6 @@
       optionList(els.platform, unique(items.map(i => i.platform), "全部平台"));
       optionList(els.business, ["全部标签", ...businessTags]);
       optionList(els.category, unique(items.map(i => i.category), "全部类型"));
-      optionList(els.status, ["全部状态", "已核验", "待复核", "7月追踪"]);
       optionList(els.newBusiness, businessTags);
       optionList(els.newCategory, unique(items.map(i => i.category), "AI入口").filter(v => v !== "全部类型"));
     }
@@ -1147,15 +1141,6 @@
       editingItemId = "";
       renderList();
     }
-    function markItemVerified(itemId) {
-      const item = allItems().find(candidate => candidate.id === itemId);
-      if (!item || item.status !== "待复核") return;
-      if (!window.confirm(`是否确认已复核“${item.title}”？\n确认后状态将改为“已核验”。`)) return;
-      const edits = getItemEdits();
-      edits[itemId] = { ...(edits[itemId] || {}), status: "已核验" };
-      setItemEdits(edits);
-      renderList();
-    }
     function renderSourceWeights() {
       const rows = Array.isArray(generatedMeta.sourceWeights) ? generatedMeta.sourceWeights : [];
       const channels = unique(rows.map(row => row.channel).filter(Boolean).sort(), "全部渠道");
@@ -1213,7 +1198,6 @@
       document.getElementById("metric-june").textContent = scoped.length;
       document.getElementById("metric-high").textContent = scoped.filter(i => i.priority === "高").length;
       document.getElementById("metric-ai").textContent = scoped.filter(i => i.category === "AI入口").length;
-      document.getElementById("metric-review").textContent = scoped.filter(i => i.status === "待复核").length;
     }
     function currentCandidates() {
       const existingUrls = new Set(allItems().flatMap(item => itemSources(item).map(source => source.url)));
@@ -1267,14 +1251,65 @@
         businessTags: businessTagsOf(item),
         businessTag: businessTagsOf(item)[0] || ""
       };
-      setTrash([{ id: item.id, candidateIds: ids, deletedAt: localDateISO(), item: snapshot }, ...next]);
+      setTrash([{ id: item.id, kind: "candidate", origin: "candidate", originalItemId: item.id, candidateIds: ids, deletedAt: localDateISO(), item: snapshot }, ...next]);
+    }
+    function recycleIntelItem(itemId) {
+      const item = allItems().find(candidate => candidate.id === itemId);
+      if (!item) return;
+      const origin = getCustom().some(candidate => candidate.id === itemId) ? "custom" : "base";
+      const snapshot = {
+        ...item,
+        sources: itemSources(item),
+        businessTags: businessTagsOf(item),
+        businessTag: businessTagsOf(item)[0] || ""
+      };
+      const next = getTrash().filter(record => !(record.kind === "intel" && record.originalItemId === itemId));
+      setTrash([{
+        id: `intel-trash-${itemId}-${Date.now()}`,
+        kind: "intel",
+        origin,
+        originalItemId: itemId,
+        candidateIds: [],
+        deletedAt: localDateISO(),
+        item: snapshot
+      }, ...next]);
+      removeIntelItem(itemId);
     }
     function removeTrashRecord(recordId) {
       setTrash(getTrash().filter(record => record.id !== recordId));
     }
     function purgeTrashRecord(recordId) {
       const record = getTrash().find(item => item.id === recordId);
-      if (record) addPurgedIds(record.candidateIds);
+      if (record && record.kind !== "intel") addPurgedIds(record.candidateIds);
+      removeTrashRecord(recordId);
+    }
+    function restoreTrashRecord(recordId) {
+      const record = getTrash().find(item => item.id === recordId);
+      if (!record) return;
+      if (record.kind !== "intel") {
+        removeTrashRecord(recordId);
+        return;
+      }
+      const item = record.item;
+      const itemId = record.originalItemId || item?.id;
+      if (!item || !itemId) {
+        removeTrashRecord(recordId);
+        return;
+      }
+      setRemovedIntelIds(getRemovedIntelIds().filter(id => id !== itemId));
+      if (record.origin === "custom") {
+        setCustom([item, ...getCustom().filter(candidate => candidate.id !== itemId)]);
+      } else {
+        const base = baseIntel.find(candidate => candidate.id === itemId);
+        if (base) {
+          const edits = getItemEdits();
+          edits[itemId] = { ...(edits[itemId] || {}), title: item.title, summary: item.summary, status: item.status };
+          setItemEdits(edits);
+        } else {
+          setCustom([item, ...getCustom().filter(candidate => candidate.id !== itemId)]);
+        }
+      }
+      setBusinessTags(itemId, item.businessTags || []);
       removeTrashRecord(recordId);
     }
     function renderTagMenu(anchor, item) {
@@ -1426,7 +1461,7 @@
       const records = getTrash();
       count.textContent = records.length;
       if (!records.length) {
-        list.innerHTML = `<div class="candidate-empty">回收站是空的。候选池里点击“忽略”的线索会在这里保留 ${trashRetentionDays} 天。</div>`;
+        list.innerHTML = `<div class="candidate-empty">回收站是空的。删除的情报和忽略的候选会在这里保留 ${trashRetentionDays} 天。</div>`;
         return;
       }
       list.innerHTML = records.map(record => {
@@ -1436,7 +1471,7 @@
           <article class="candidate-card">
             <div class="candidate-top">
               <div>
-                <p class="platform">${item.platform || "候选池"} · 删除于 ${record.deletedAt} · 剩余 ${left} 天</p>
+                <p class="platform">${item.platform || "候选池"} · ${record.kind === "intel" ? "情报列表删除" : "候选池忽略"} · ${record.deletedAt} · 剩余 ${left} 天</p>
                 <h3>${item.title}</h3>
               </div>
               <div class="score">${candidateScore(item)}<small>买家侧</small></div>
@@ -1454,9 +1489,11 @@
       }).join("");
       list.querySelectorAll("[data-restore]").forEach(button => {
         button.addEventListener("click", () => {
-          removeTrashRecord(button.dataset.restore);
+          restoreTrashRecord(button.dataset.restore);
+          renderFilters();
           renderCandidates();
           renderTrash();
+          renderList();
         });
       });
       list.querySelectorAll("[data-purge]").forEach(button => {
@@ -1464,6 +1501,7 @@
           purgeTrashRecord(button.dataset.purge);
           renderCandidates();
           renderTrash();
+          renderList();
         });
       });
       wireTagEditors(list);
@@ -1473,7 +1511,6 @@
       const platform = els.platform.value || "全部平台";
       const business = els.business.value || "全部标签";
       const category = els.category.value || "全部类型";
-      const status = els.status.value || "全部状态";
       const items = allItems();
       renderMetrics(items);
       const filtered = items.filter(item => {
@@ -1482,7 +1519,6 @@
         return (platform === "全部平台" || item.platform === platform)
           && (business === "全部标签" || tags.includes(business))
           && (category === "全部类型" || item.category === category)
-          && (status === "全部状态" || item.status === status)
           && inSelectedMonth(item)
           && text.includes(q);
       });
@@ -1497,9 +1533,6 @@
             <div class="title-row">
               <div><p class="platform">${escapeHtml(item.platform)}</p><h3>${escapeHtml(item.title)}</h3></div>
               <div class="title-actions">
-                ${item.status === "待复核"
-                  ? `<button class="pill pending status-action" data-verify-item="${escapeHtml(item.id)}" type="button">待复核</button>`
-                  : `<span class="pill">${escapeHtml(item.status)}</span>`}
                 <button data-edit-item="${item.id}" type="button">编辑</button>
               </div>
             </div>
@@ -1524,14 +1557,12 @@
       els.list.querySelectorAll("[data-remove]").forEach(button => {
         button.addEventListener("click", () => {
           selectedMergeIds.delete(button.dataset.remove);
-          removeIntelItem(button.dataset.remove);
+          recycleIntelItem(button.dataset.remove);
           renderFilters();
           renderCandidates();
+          renderTrash();
           renderList();
         });
-      });
-      els.list.querySelectorAll("[data-verify-item]").forEach(button => {
-        button.addEventListener("click", () => markItemVerified(button.dataset.verifyItem));
       });
       els.list.querySelectorAll("[data-edit-item]").forEach(button => {
         button.addEventListener("click", () => {
@@ -1661,7 +1692,6 @@
       els.platform.addEventListener(type, renderList);
       els.business.addEventListener(type, renderList);
       els.category.addEventListener(type, renderList);
-      els.status.addEventListener(type, renderList);
       els.sourceWeightSearch.addEventListener(type, renderSourceWeights);
       els.sourceWeightChannel.addEventListener(type, renderSourceWeights);
     });
