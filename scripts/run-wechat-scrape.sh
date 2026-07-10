@@ -5,10 +5,17 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 URL="${1:-}"
 
 if [[ -z "$URL" ]]; then
-  echo "Usage: scripts/run-wechat-scrape.sh https://mp.weixin.qq.com/s/xxxx"
+  echo "Usage:"
+  echo "  scripts/run-wechat-scrape.sh https://mp.weixin.qq.com/s/xxxx"
+  echo "  scripts/run-wechat-scrape.sh --from-dashboard --limit 8"
   exit 1
 fi
-shift || true
+if [[ "$URL" == "--from-dashboard" ]]; then
+  EXTRA_ARGS=("$@")
+else
+  shift || true
+  EXTRA_ARGS=(--url "$URL" "$@")
+fi
 
 if command -v node >/dev/null 2>&1; then
   NODE_BIN="$(command -v node)"
@@ -22,4 +29,4 @@ if [[ ! -x "$NODE_BIN" ]]; then
 fi
 
 cd "$ROOT_DIR"
-"$NODE_BIN" scripts/scrape-wechat-chrome.cjs --url "$URL" "$@"
+"$NODE_BIN" scripts/scrape-wechat-chrome.cjs "${EXTRA_ARGS[@]}"

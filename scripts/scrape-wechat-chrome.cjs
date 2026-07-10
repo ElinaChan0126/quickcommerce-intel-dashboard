@@ -4,7 +4,7 @@ const fs = require("fs");
 const http = require("http");
 const path = require("path");
 const crypto = require("crypto");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 
 const DEFAULT_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
@@ -314,6 +314,77 @@ function injectCandidatesIntoDashboard(dashboardPath, newCandidates) {
   return { total: merged.length, inserted: newCandidates.length };
 }
 
+function readDashboardBlock(dashboardPath) {
+  const text = fs.readFileSync(dashboardPath, "utf8");
+  const candidatesMatch = text.match(/const generatedCandidates = ([\s\S]*?);\n\s*const generatedMeta = /);
+  const metaMatch = text.match(/const generatedMeta = ([\s\S]*?);\n\s*\/\/ AUTO_CANDIDATES_END/);
+  if (!candidatesMatch || !metaMatch) {
+    throw new Error(`Could not find AUTO_CANDIDATES block in ${dashboardPath}`);
+  }
+  return {
+    candidates: JSON.parse(candidatesMatch[1]),
+    meta: JSON.parse(metaMatch[1]),
+  };
+}
+
+function pendingWechatUrls(dashboardPath, limit) {
+  const { candidates } = readDashboardBlock(dashboardPath);
+  const urls = [];
+  for (const item of candidates) {
+    const sources = Array.isArray(item.sources) ? item.sources : [];
+    const sourceUrls = [item.sourceUrl, ...sources.map(source => source && source.url)].filter(Boolean);
+    const isAlreadyFullText = item.needsFullText === false && /本地已读全文|已补全文/.test(`${item.contentStatus || ""} ${item.fullTextStatus || ""}`);
+    if (isAlreadyFullText) continue;
+    for (const sourceUrl of sourceUrls) {
+      if (!sourceUrl.includes("mp.weixin.qq.com")) continue;
+      if (!urls.includes(sourceUrl)) urls.push(sourceUrl);
+      if (limit && urls.length >= limit) return urls;
+    }
+  }
+  return urls;
+}
+
+function scrapeDashboardWechatLinks(dashboardPath, limit) {
+  const urls = pendingWechatUrls(dashboardPath, limit);
+  const results = [];
+  urls.forEach((wechatUrl, index) => {
+    const child = spawnSync(process.execPath, [
+      __filename,
+      "--url",
+      wechatUrl,
+      "--dashboard",
+      dashboardPath,
+      "--port",
+      String(9227 + index),
+    ], {
+      cwd: path.dirname(dashboardPath),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let parsed = null;
+    try {
+      parsed = child.stdout ? JSON.parse(child.stdout) : null;
+    } catch {
+      parsed = null;
+    }
+    results.push({
+      url: wechatUrl,
+      ok: child.status === 0 && Boolean(parsed && parsed.ok),
+      status: child.status,
+      title: parsed && parsed.title,
+      candidateCount: parsed && parsed.candidateCount,
+      stderr: child.stderr ? child.stderr.trim().slice(0, 500) : "",
+    });
+  });
+  return {
+    ok: results.every(result => result.ok),
+    scanned: urls.length,
+    success: results.filter(result => result.ok).length,
+    failed: results.filter(result => !result.ok).length,
+    results,
+  };
+}
+
 async function main() {
   const url = argValue("--url", process.argv[2] || "");
   const outDir = argValue("--out", "wechat-articles");
@@ -322,6 +393,18 @@ async function main() {
   const port = Number(argValue("--port", "9227"));
   const shouldSaveFiles = hasFlag("--save-files");
   const shouldInject = !hasFlag("--no-inject");
+  if (hasFlag("--from-dashboard")) {
+    const limit = Number(argValue("--limit", "8"));
+    if (hasFlag("--dry-run")) {
+      const urls = pendingWechatUrls(dashboardPath, limit);
+      console.log(JSON.stringify({ ok: true, dryRun: true, scanned: urls.length, urls }, null, 2));
+      return;
+    }
+    const result = scrapeDashboardWechatLinks(dashboardPath, limit);
+    console.log(JSON.stringify(result, null, 2));
+    if (result.failed) process.exitCode = 1;
+    return;
+  }
   if (!url || !url.includes("mp.weixin.qq.com")) {
     throw new Error("Usage: node scripts/scrape-wechat-chrome.cjs --url https://mp.weixin.qq.com/s/...");
   }

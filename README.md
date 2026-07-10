@@ -30,6 +30,34 @@
 - GitHub Actions 自动抓取：使用 Bing、360 和搜狗微信公开搜索发现公众号文章标题、链接和摘要；对能直接访问的 `mp.weixin.qq.com` 链接尝试提取元信息。
 - 本地 Chrome 抓取：`scripts/scrape-wechat-chrome.cjs` 会启动你电脑上的 Google Chrome，等待页面渲染后读取 `#js_content`，再把正文转换成候选事件并注入 `index.html`。这更接近人工打开微信文章，成功率通常高于云端请求，但仍可能遇到微信访问限制。
 
+## 本机自动抓取公众号全文
+
+GitHub Actions 会在云端自动搜集公开资讯；公众号全文抓取需要本机 Chrome，所以用 macOS LaunchAgent 在本机补跑。安装一次即可：
+
+```bash
+cd /Users/yilin.chenyl/Documents/Codex/2026-07-07/wo/github-site
+scripts/install-local-scheduler.sh
+```
+
+安装后，这台 Mac 会在每天 09:45、14:45、20:45 自动执行：
+
+1. 拉取 GitHub 最新代码。
+2. 运行 `auto_update_intel.py` 搜索普通网页、新闻和公众号线索。
+3. 扫描 `index.html` 里的公众号候选链接，自动读取公众号全文并写回公众号候选区。
+4. 如果页面有变化，自动 commit 并 push 到 GitHub Pages 仓库。
+
+可以随时手动跑完整流程：
+
+```bash
+scripts/run-local-daily-update.sh
+```
+
+也可以只预览当前待补抓的公众号链接：
+
+```bash
+scripts/run-wechat-scrape.sh --from-dashboard --dry-run
+```
+
 示例：
 
 ```bash
