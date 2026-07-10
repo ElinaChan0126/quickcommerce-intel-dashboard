@@ -1406,9 +1406,12 @@
       const scannedSources = Number(generatedMeta.sourceCount || 0);
       const queries = Number(generatedMeta.queryCount || 0);
       const updated = generatedMeta.updatedAt || "待运行";
+      const xhsNote = generatedMeta.xhsLastRunAt
+        ? ` 小红书最近检索于 ${generatedMeta.xhsLastRunAt}，读取 ${generatedMeta.xhsReadCount || 0} 篇，新增 ${generatedMeta.xhsInserted || 0} 条。`
+        : " 小红书将在本地 xhs 登录状态可用时加入自动检索。";
       const note = total
-        ? `最近一次自动抓取已完成，共抓到 ${total} 条候选；当前月份筛选、已入库和回收站规则后，还有 ${visible} 条待处理。`
-        : `最近一次自动抓取已完成，但没有抓到新的候选。你仍然可以从这里确认系统确实运行过。`;
+        ? `最近一次自动抓取已完成，共抓到 ${total} 条候选；当前月份筛选、已入库和回收站规则后，还有 ${visible} 条待处理。${xhsNote}`
+        : `最近一次自动抓取已完成，但没有抓到新的候选。你仍然可以从这里确认系统确实运行过。${xhsNote}`;
       status.innerHTML = `
         <div class="crawl-stat"><span>最近抓取</span><strong>${updated}</strong></div>
         <div class="crawl-stat"><span>扫描来源</span><strong>${scannedSources}</strong></div>

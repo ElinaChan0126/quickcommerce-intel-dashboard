@@ -70,6 +70,7 @@ DATA_SOURCES = [
     {"name": "京东到家官网", "domain": "jddj.com", "focus": "即时零售、商超便利、平台活动", "weight": 8},
     {"name": "饿了么官网", "domain": "ele.me", "focus": "本地生活、蜂鸟即配、平台活动", "weight": 8},
     {"name": "公众号索引", "domain": "mp.weixin.qq.com", "focus": "平台官方、技术团队、行业自媒体", "weight": 5},
+    {"name": "小红书", "domain": "xiaohongshu.com", "focus": "用户侧体验、平台活动、即时配送讨论", "weight": 5},
 ]
 
 WECHAT_ACCOUNTS = {
