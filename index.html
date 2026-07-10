@@ -20,6 +20,7 @@
       --shadow: 0 18px 50px rgba(40, 49, 35, .08);
     }
     * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 84px; }
     body {
       margin: 0;
       background: linear-gradient(180deg, rgba(223,241,234,.9), rgba(245,247,242,0) 330px), var(--bg);
@@ -30,6 +31,22 @@
     button, input, select, textarea { font: inherit; }
     button, select { cursor: pointer; }
     .shell { width: min(1480px, 100%); margin: 0 auto; padding: 24px; }
+    .side-nav {
+      position: fixed; top: 50%; right: 18px; z-index: 30; width: 148px; transform: translateY(-50%);
+      border: 1px solid rgba(207,218,203,.92); border-radius: 8px; background: rgba(255,255,255,.9);
+      box-shadow: 0 18px 46px rgba(40,49,35,.13); padding: 10px; backdrop-filter: blur(14px);
+    }
+    .side-nav-title { display: block; padding: 5px 8px 9px; color: var(--muted); font-size: 11px; font-weight: 850; }
+    .side-nav-list { display: grid; gap: 3px; }
+    .side-nav a {
+      display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 7px; align-items: center;
+      border-radius: 6px; color: #4e574e; padding: 9px 8px; text-decoration: none; font-size: 12px; font-weight: 800;
+      transition: background .16s ease, color .16s ease, transform .16s ease;
+    }
+    .side-nav a:hover { background: var(--soft); color: var(--fg); transform: translateX(-2px); }
+    .side-nav-index { color: #9aa498; font-size: 10px; font-weight: 900; }
+    .side-nav a.is-active { background: #dff1ea; color: #095f51; }
+    .side-nav a.is-active .side-nav-index { color: var(--teal); }
     .topbar { display: flex; justify-content: space-between; gap: 20px; align-items: center; padding-bottom: 22px; }
     .brand-lockup { display: flex; gap: 14px; align-items: center; min-width: 0; }
     .app-mark {
@@ -79,6 +96,7 @@
     .metric strong { display: block; margin-top: 14px; font-size: 42px; line-height: 1; }
     .metric p { margin: 12px 0 0; color: var(--muted); font-size: 13px; }
     .workspace { display: grid; grid-template-columns: minmax(0,1fr) 380px; gap: 24px; align-items: start; }
+    .workspace + .candidate-board { margin-top: 24px; }
     .board, .panel, .candidate-board { border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.9); box-shadow: var(--shadow); }
     .board { padding: 22px; }
     .panel { padding: 20px; }
@@ -226,6 +244,21 @@
       .signals { border-left: 0; border-top: 1px solid var(--line); padding: 20px 0 0; }
       .rail { grid-template-columns: 1fr 1fr; }
     }
+    @media (min-width: 1281px) {
+      .shell { padding-right: 184px; }
+    }
+    @media (max-width: 1280px) {
+      html { scroll-padding-top: 78px; }
+      .side-nav {
+        position: sticky; top: 8px; right: auto; width: 100%; max-width: 100%; transform: none;
+        margin: 0 0 14px; padding: 7px 8px; overflow-x: auto; scrollbar-width: none;
+      }
+      .side-nav::-webkit-scrollbar { display: none; }
+      .side-nav-title { display: none; }
+      .side-nav-list { display: flex; gap: 4px; width: max-content; }
+      .side-nav a { grid-template-columns: auto auto; min-height: 38px; padding: 8px 10px; white-space: nowrap; }
+      .side-nav a:hover { transform: none; }
+    }
     @media (max-width: 820px) {
       .shell { padding: 16px; }
       .topbar, .board-head, .candidate-head, .toolbar, .module-title, .merge-toolbar { align-items: stretch; flex-direction: column; }
@@ -259,6 +292,17 @@
       <div class="badge"><span>最近更新</span><strong>2026-07-08</strong></div>
     </header>
 
+    <nav class="side-nav" aria-label="页面导航">
+      <span class="side-nav-title">页面导航</span>
+      <div class="side-nav-list">
+        <a class="is-active" href="#brief" data-nav-target="brief" aria-current="location"><span class="side-nav-index">01</span><span>今日摘要</span></a>
+        <a href="#metrics" data-nav-target="metrics"><span class="side-nav-index">02</span><span>核心指标</span></a>
+        <a href="#candidates" data-nav-target="candidates"><span class="side-nav-index">03</span><span>候选池</span></a>
+        <a href="#intel-workspace" data-nav-target="intel-workspace"><span class="side-nav-index">04</span><span>情报工作区</span></a>
+        <a href="#trash" data-nav-target="trash"><span class="side-nav-index">05</span><span>回收站</span></a>
+      </div>
+    </nav>
+
     <div class="toolbar">
       <label class="month-control"><span>查看月份</span><select id="month-filter"></select></label>
       <div class="module-actions">
@@ -267,7 +311,7 @@
       </div>
     </div>
 
-    <section class="brief module" data-module="brief">
+    <section class="brief module" id="brief" data-module="brief">
       <div class="collapsible-content" style="display: contents;">
         <div>
           <p class="label">今日摘要</p>
@@ -283,13 +327,13 @@
       </div>
     </section>
 
-    <section class="metrics module" aria-label="关键指标" data-module="metrics">
+    <section class="metrics module" id="metrics" aria-label="关键指标" data-module="metrics">
       <article class="metric collapsible-content"><span id="metric-month-label">当前月份条目</span><strong id="metric-june">0</strong><p>按上方月份筛选统计</p></article>
       <article class="metric collapsible-content"><span>高优先级信号</span><strong id="metric-high">0</strong><p>建议日报重点讨论</p></article>
       <article class="metric collapsible-content"><span>AI 相关动作</span><strong id="metric-ai">0</strong><p>按当前月份统计</p></article>
     </section>
 
-    <section class="candidate-board module" aria-label="自动抓取候选" data-module="candidates">
+    <section class="candidate-board module" id="candidates" aria-label="自动抓取候选" data-module="candidates">
       <div class="candidate-head">
         <div>
           <p class="label">自动候选池</p>
@@ -303,20 +347,7 @@
       <div class="candidate-list collapsible-content" id="candidate-list"></div>
     </section>
 
-    <section class="candidate-board module" aria-label="回收站" data-module="trash">
-      <div class="candidate-head">
-        <div>
-          <p class="label">回收站</p>
-          <h2>删除或忽略的情报会保留 30 天，可恢复或彻底删除</h2>
-        </div>
-        <div class="module-actions">
-          <div class="badge"><span>回收站条目</span><strong id="trash-count">0</strong></div>
-        </div>
-      </div>
-      <div class="candidate-list collapsible-content" id="trash-list"></div>
-    </section>
-
-    <section class="workspace">
+    <section class="workspace" id="intel-workspace">
       <div class="board module" data-module="intel-list">
         <div class="board-head">
           <div><p class="label">情报列表</p><h2>按平台、标签和类型筛选</h2></div>
@@ -381,6 +412,19 @@
           </div>
         </section>
       </aside>
+    </section>
+
+    <section class="candidate-board module" id="trash" aria-label="回收站" data-module="trash">
+      <div class="candidate-head">
+        <div>
+          <p class="label">回收站</p>
+          <h2>删除或忽略的情报会保留 30 天，可恢复或彻底删除</h2>
+        </div>
+        <div class="module-actions">
+          <div class="badge"><span>回收站条目</span><strong id="trash-count">0</strong></div>
+        </div>
+      </div>
+      <div class="candidate-list collapsible-content" id="trash-list"></div>
     </section>
   </main>
 
@@ -1644,6 +1688,43 @@
       renderCandidates();
       renderList();
     }
+    function initSideNavigation() {
+      const links = [...document.querySelectorAll("[data-nav-target]")];
+      const sections = links
+        .map(link => ({ link, section: document.getElementById(link.dataset.navTarget) }))
+        .filter(item => item.section);
+      if (!sections.length) return;
+      const setActive = activeLink => {
+        links.forEach(link => {
+          const active = link === activeLink;
+          link.classList.toggle("is-active", active);
+          if (active) link.setAttribute("aria-current", "location");
+          else link.removeAttribute("aria-current");
+        });
+      };
+      const updateActive = () => {
+        const marker = Math.min(220, window.innerHeight * .3);
+        let active = sections[0];
+        sections.forEach(item => {
+          if (item.section.getBoundingClientRect().top <= marker) active = item;
+        });
+        const atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 12;
+        setActive(atBottom ? sections[sections.length - 1].link : active.link);
+      };
+      let scheduled = false;
+      const scheduleUpdate = () => {
+        if (scheduled) return;
+        scheduled = true;
+        window.requestAnimationFrame(() => {
+          updateActive();
+          scheduled = false;
+        });
+      };
+      links.forEach(link => link.addEventListener("click", () => setActive(link)));
+      window.addEventListener("scroll", scheduleUpdate, { passive: true });
+      window.addEventListener("resize", scheduleUpdate);
+      updateActive();
+    }
     function initCollapsibleModules() {
       const collapsed = new Set(JSON.parse(localStorage.getItem(collapsedModulesKey) || "[]"));
       document.querySelectorAll(".module[data-module]").forEach(module => {
@@ -1698,6 +1779,7 @@
     els.month.addEventListener("change", () => syncMonth(els.month));
     els.listMonth.addEventListener("change", () => syncMonth(els.listMonth));
     renderFilters();
+    initSideNavigation();
     initCollapsibleModules();
     renderCandidates();
     renderTrash();
