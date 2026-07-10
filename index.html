@@ -259,7 +259,7 @@
       <div class="candidate-head">
         <div>
           <p class="label">自动候选池</p>
-          <h2>每日抓取后先放这里，确认后再进入正式日报</h2>
+          <h2>网页与公众号线索统一展示，确认后再进入正式日报</h2>
         </div>
         <div class="module-actions">
           <div class="badge"><span>候选更新时间</span><strong id="candidate-updated">待运行</strong></div>
@@ -267,19 +267,6 @@
       </div>
       <div class="crawl-status collapsible-content" id="crawl-status"></div>
       <div class="candidate-list collapsible-content" id="candidate-list"></div>
-    </section>
-
-    <section class="candidate-board module" aria-label="公众号候选" data-module="wechat-candidates">
-      <div class="candidate-head">
-        <div>
-          <p class="label">公众号候选区</p>
-          <h2>先展示系统能搜到的公众号线索，全文拿不到时可粘贴正文解析</h2>
-        </div>
-        <div class="module-actions">
-          <div class="badge"><span>公众号线索</span><strong id="wechat-candidate-count">0</strong></div>
-        </div>
-      </div>
-      <div class="candidate-list collapsible-content" id="wechat-candidate-list"></div>
     </section>
 
     <section class="candidate-board module" aria-label="回收站" data-module="trash">
@@ -957,7 +944,6 @@
       enrichingCandidateId = "";
       renderFilters();
       renderCandidates();
-      renderWechatCandidates();
       renderList();
     }
     function saveItemTextEdit(itemId, panel) {
@@ -1117,7 +1103,6 @@
           setBusinessTags(item.id, [...tags]);
           menu.remove();
           renderCandidates();
-          renderWechatCandidates();
           renderTrash();
           renderList();
         });
@@ -1142,12 +1127,10 @@
       const list = document.getElementById("candidate-list");
       const updated = document.getElementById("candidate-updated");
       updated.textContent = generatedMeta.updatedAt || "待运行";
-      const allCandidates = currentCandidates();
-      const candidates = allCandidates.filter(item => !isWechatCandidate(item));
-      renderCrawlStatus(allCandidates);
+      const candidates = currentCandidates();
+      renderCrawlStatus(candidates);
       if (!candidates.length) {
-        const total = Number(generatedMeta.candidateCount ?? generatedCandidates.length);
-        list.innerHTML = `<div class="candidate-empty">${monthLabel(currentMonth())}暂无未处理的普通网页候选。${total ? "公众号线索会单独展示在下方公众号候选区。" : "系统已完成抓取，本次没有检索到新候选。"}</div>`;
+        list.innerHTML = `<div class="candidate-empty">${monthLabel(currentMonth())}暂无未处理候选。系统已完成抓取，本次没有检索到新的网页或公众号线索。</div>`;
         return;
       }
       list.innerHTML = candidates.map(candidateCardHtml).join("");
@@ -1176,19 +1159,6 @@
             </div>
           </div>
         </article>`;
-    }
-    function renderWechatCandidates() {
-      const list = document.getElementById("wechat-candidate-list");
-      const count = document.getElementById("wechat-candidate-count");
-      const candidates = currentCandidates().filter(isWechatCandidate);
-      count.textContent = candidates.length;
-      if (!candidates.length) {
-        list.innerHTML = `<div class="candidate-empty">${monthLabel(currentMonth())}暂无公众号候选。系统会继续按目标公众号名和行业关键词自动搜索，搜到后会先放到这里。</div>`;
-        return;
-      }
-      list.innerHTML = candidates.map(candidateCardHtml).join("");
-      wireCandidateActions(list);
-      wireTagEditors(list);
     }
     function wireCandidateActions(scope) {
       scope.querySelectorAll("[data-accept]").forEach(button => {
@@ -1219,7 +1189,6 @@
           addPurgedIds(itemCandidateIds(item));
           renderFilters();
           renderCandidates();
-          renderWechatCandidates();
           renderTrash();
           renderList();
         });
@@ -1229,7 +1198,6 @@
           const item = candidatePool().find(candidate => candidate.id === button.dataset.ignore);
           if (item) recycleCandidate(item);
           renderCandidates();
-          renderWechatCandidates();
           renderTrash();
         });
       });
@@ -1237,7 +1205,6 @@
         button.addEventListener("click", () => {
           enrichingCandidateId = enrichingCandidateId === button.dataset.enrich ? "" : button.dataset.enrich;
           renderCandidates();
-          renderWechatCandidates();
         });
       });
       scope.querySelectorAll("[data-fulltext-parse]").forEach(button => {
@@ -1250,7 +1217,6 @@
         button.addEventListener("click", () => {
           enrichingCandidateId = "";
           renderCandidates();
-          renderWechatCandidates();
         });
       });
     }
@@ -1290,7 +1256,6 @@
         button.addEventListener("click", () => {
           removeTrashRecord(button.dataset.restore);
           renderCandidates();
-          renderWechatCandidates();
           renderTrash();
         });
       });
@@ -1298,7 +1263,6 @@
         button.addEventListener("click", () => {
           purgeTrashRecord(button.dataset.purge);
           renderCandidates();
-          renderWechatCandidates();
           renderTrash();
         });
       });
@@ -1396,7 +1360,6 @@
       document.getElementById("date").value = "2026-07-08";
       renderFilters();
       renderCandidates();
-      renderWechatCandidates();
       renderList();
     });
     function selectedMonthFrom(select) {
@@ -1411,7 +1374,6 @@
       els.month.selectedIndex = Math.max(0, values.indexOf(selected));
       els.listMonth.selectedIndex = Math.max(0, values.indexOf(selected));
       renderCandidates();
-      renderWechatCandidates();
       renderList();
     }
     function initCollapsibleModules() {
@@ -1471,7 +1433,6 @@
     renderFilters();
     initCollapsibleModules();
     renderCandidates();
-    renderWechatCandidates();
     renderTrash();
     renderSourceWeights();
     renderList();
