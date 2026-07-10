@@ -420,7 +420,7 @@
       {id:"shansong-ai-order",date:"2026-06-25",platform:"闪送",title:"上线 AI 智能下单功能",type:"AI 智能下单",category:"AI入口",summary:"闪送 APP 下单页新增 AI 下单入口，用户可用语音或文字描述寄件、收件信息，系统自动识别地址、手机号等核心订单信息并生成配送订单。",judge:"一对一急送平台把 AI 前置到下单链路，核心价值是降低同城配送信息填写门槛，并减少地址、联系方式等人工录入错误。",sourceName:"新浪财经 / 大象新闻",sourceUrl:"https://finance.sina.cn/stock/jdts/2026-06-25/detail-inieqwsy5766689.d.html",status:"已核验",priority:"高"},
       {id:"jd-football-meal",date:"2026-06-30",platform:"京东外卖 / 秒送",title:"上线看球必吃套餐",type:"赛事夜宵活动",category:"营销活动",summary:"京东 APP 秒送频道上线看球套餐会场，AI 智能组套，近 200 个品牌，套餐 10 元起，满 90 元自动升级 1 对 1 直送。",judge:"京东把世界杯夜宵需求与秒送入口绑定，借 AI 组套降低用户选择成本，并强化高客单履约体验。",sourceName:"中国经济网",sourceUrl:"http://finance.ce.cn/home/jrzq/dc/202606/t20260630_3061438.shtml",status:"已核验",priority:"高"},
       {id:"taobao-ai-claw",date:"2026-06-30",platform:"淘宝闪购",title:"燎原深耕计划 2.0，首发闪购助手",type:"B 端 AI 工具",category:"AI入口",summary:"开放新签、代运营、硬件、商业化渠道四大服务商合作场景；首发服务商代运营工作台 AI Claw 闪购助手。",judge:"即时零售运营能力向服务商生态下沉，商户诊断、店装制图、异常巡检会被工具化。",sourceName:"同花顺转载 IT之家",sourceUrl:"https://news.10jqka.com.cn/20260630/c677830378.shtml",status:"已核验",priority:"高"},
-      {id:"sf-alipay-ai",date:"2026-07-07",platform:"顺丰同城",title:"接入支付宝 AI 生态，一句话叫跑腿",type:"AI 对话入口",category:"AI入口",summary:"用户在 AI 版支付宝阿宝对话界面发出跑腿指令，可唤起我的快递跑腿服务卡片，并用顺丰同城完成下单。",judge:"跑腿入口从搜索和小程序前移到 AI 对话，第三方即配有机会成为品牌小程序 AI 服务链路的履约底座。",sourceName:"京报网",sourceUrl:"https://news.bjd.com.cn/2026/07/07/11850108.shtml",status:"7月追踪",priority:"高"}
+      {id:"sf-alipay-ai",date:"2026-07-07",platform:"顺丰同城",title:"接入支付宝 AI 生态，一句话叫跑腿",type:"AI 对话入口",category:"AI入口",summary:"用户在 AI 版支付宝阿宝对话界面发出跑腿指令，可唤起我的快递跑腿服务卡片，并用顺丰同城完成下单。",judge:"跑腿入口从搜索和小程序前移到 AI 对话，第三方即配有机会成为品牌小程序 AI 服务链路的履约底座。",sourceName:"多来源",sourceUrl:"https://news.bjd.com.cn/2026/07/07/11850108.shtml",sources:[{name:"京报网",url:"https://news.bjd.com.cn/2026/07/07/11850108.shtml"},{name:"快递生态圈（公众号）",url:"https://mp.weixin.qq.com/s/scFzc4yini_hfj18KOKJgQ"}],status:"待复核",priority:"高"}
     ];
     // AUTO_CANDIDATES_START
     const generatedCandidates = [
@@ -538,6 +538,7 @@
     const itemEditKey = "quick-commerce-intel-item-edits";
     const removedIntelKey = "quick-commerce-intel-removed-items";
     const candidateEnrichmentKey = "quick-commerce-intel-candidate-enrichments";
+    const sfAlipayRecoveryKey = "quick-commerce-intel-recover-sf-alipay-ai-20260710";
     const trashRetentionDays = 30;
     const els = {
       list: document.getElementById("list"),
@@ -593,6 +594,20 @@
         .map(applyItemEdits)
         .sort((a, b) => b.date.localeCompare(a.date));
     };
+    function recoverSfAlipayIntelOnce() {
+      if (localStorage.getItem(sfAlipayRecoveryKey)) return;
+      const isSameEvent = item => {
+        const text = `${item.platform || ""} ${item.title || ""} ${item.summary || ""}`;
+        return text.includes("顺丰") && text.includes("支付宝") && text.includes("AI");
+      };
+      const hasMergedReplacement = getCustom().some(isSameEvent);
+      const removed = getRemovedIntelIds();
+      if (!hasMergedReplacement && removed.includes("sf-alipay-ai")) {
+        setRemovedIntelIds(removed.filter(id => id !== "sf-alipay-ai"));
+      }
+      localStorage.setItem(sfAlipayRecoveryKey, "done");
+    }
+    recoverSfAlipayIntelOnce();
     const itemMonth = item => (item.date || "").slice(0, 7);
     const escapeHtml = value => String(value || "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
     const cleanBusinessText = text => String(text || "").replaceAll(placeholderSummary, "");
