@@ -145,10 +145,8 @@
     .crawl-note { grid-column: 1 / -1; border: 1px dashed var(--line); border-radius: 8px; background: rgba(255,255,255,.74); color: var(--muted); padding: 12px; font-size: 13px; line-height: 1.6; }
     .candidate-empty { border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); padding: 18px; line-height: 1.7; }
     .candidate-card { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 16px; }
-    .candidate-top { display: flex; justify-content: space-between; gap: 14px; align-items: start; }
+    .candidate-top { display: block; }
     .candidate-top h3 { margin-top: 4px; font-size: 18px; line-height: 1.35; }
-    .score { min-width: 54px; border-radius: 8px; background: #dff1ea; color: #095f51; padding: 8px 10px; text-align: center; font-weight: 850; }
-    .score small { display: block; margin-top: 3px; color: #347568; font-size: 10px; font-weight: 850; }
     .candidate-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .candidate-actions button { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); padding: 9px 12px; font-size: 13px; font-weight: 850; }
     .candidate-actions button:first-child { border-color: var(--teal); background: var(--teal); color: #fff; }
@@ -2673,7 +2671,6 @@
               <p class="platform">${escapeHtml(item.platform || "待识别平台")} · ${escapeHtml(item.date || "日期待识别")}</p>
               <h3>${escapeHtml(item.title)}</h3>
             </div>
-            <div class="score">${candidateScore(item)}<small>买家侧</small></div>
           </div>
           <p class="summary">${escapeHtml(item.summary)}</p>
           <div class="tags">${businessPill(item)}<span>${escapeHtml(item.category || "候选")}</span><span>${escapeHtml(sourceLabel(item))}</span>${isWechatCandidate(item) ? `<span>公众号线索</span><span>${escapeHtml(wechatStatusLabel(item))}</span>` : ""}</div>
@@ -2767,7 +2764,6 @@
                 <p class="platform">${item.platform || "候选池"} · ${record.kind === "intel" ? "情报列表删除" : "候选池忽略"} · ${record.deletedAt} · 剩余 ${left} 天</p>
                 <h3>${item.title}</h3>
               </div>
-              <div class="score">${candidateScore(item)}<small>买家侧</small></div>
             </div>
             <p class="summary">${item.summary || "暂无摘要"}</p>
             <div class="tags">${businessPill(item)}<span>${item.category || "候选"}</span><span>${sourceLabel(item)}</span></div>
