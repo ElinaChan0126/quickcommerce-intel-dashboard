@@ -1890,14 +1890,39 @@
         return value.replace(/\/$/, "");
       }
     }
+    function sourceIdentityKey(source) {
+      const name = String(source?.name || "来源").trim().toLowerCase();
+      let host = "";
+      try { host = new URL(source?.url || "").hostname.replace(/^www\./, "").toLowerCase(); } catch {}
+      return `${name}|${host}`;
+    }
+    function isTemporarySourceUrl(url) {
+      try {
+        const parsed = new URL(url);
+        return parsed.hostname.includes("weixin.sogou.com")
+          || parsed.searchParams.has("token")
+          || parsed.searchParams.has("xsec_token");
+      } catch {
+        return false;
+      }
+    }
+    function sourcePriority(source) {
+      const url = String(source?.url || "");
+      if (/^https?:\/\/mp\.weixin\.qq\.com\/s\//.test(url)) return 3;
+      if (isTemporarySourceUrl(url)) return 1;
+      return 2;
+    }
     function mergedSources(items) {
-      const byUrl = new Map();
+      const byIdentity = new Map();
       items.flatMap(itemSources).forEach(source => {
-        const key = sourceDedupKey(source.url);
-        if (!key || byUrl.has(key)) return;
-        byUrl.set(key, { name: source.name || "来源", url: source.url });
+        const key = sourceIdentityKey(source);
+        if (!key || key.endsWith("|")) return;
+        const existing = byIdentity.get(key);
+        if (!existing || sourcePriority(source) > sourcePriority(existing)) {
+          byIdentity.set(key, { name: source.name || "来源", url: source.url });
+        }
       });
-      return [...byUrl.values()];
+      return [...byIdentity.values()];
     }
     function highestPriority(items) {
       const order = { "高": 3, "中": 2, "低": 1 };
@@ -2098,17 +2123,27 @@
     }
     function itemSources(item) {
       const sources = Array.isArray(item.sources) ? item.sources : [];
-      const normalized = sources
+      const raw = sources
         .filter(source => source && source.url)
         .map(source => ({ name: source.name || "来源", url: source.url }));
-      if (normalized.length) return normalized;
-      return item.sourceUrl ? [{ name: item.sourceName || "来源", url: item.sourceUrl }] : [];
+      if (!raw.length && item.sourceUrl) raw.push({ name: item.sourceName || "来源", url: item.sourceUrl });
+      const byIdentity = new Map();
+      raw.forEach(source => {
+        const key = sourceIdentityKey(source);
+        const existing = byIdentity.get(key);
+        if (!existing || sourcePriority(source) > sourcePriority(existing)) byIdentity.set(key, source);
+      });
+      const deduped = [...byIdentity.values()];
+      const stable = deduped.filter(source => !isTemporarySourceUrl(source.url));
+      return stable.length ? stable : deduped;
     }
     function sourceLinks(item) {
       const sources = itemSources(item);
       if (!sources.length) return `<span class="source-count">暂无来源链接</span>`;
       const links = sources.slice(0, 5).map((source, index) =>
-        `<a href="${source.url}" target="_blank" rel="noreferrer">${source.name || `来源${index + 1}`}</a>`
+        isTemporarySourceUrl(source.url)
+          ? `<span class="source-count">${escapeHtml(source.name || `来源${index + 1}`)}（搜索跳转链接待刷新）</span>`
+          : `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name || `来源${index + 1}`)}</a>`
       ).join("");
       const more = sources.length > 5 ? `<span class="source-count">+${sources.length - 5} 个来源</span>` : "";
       return `<div class="source-links">${links}${more}</div>`;

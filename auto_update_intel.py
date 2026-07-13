@@ -498,6 +498,75 @@ def source_object(url: str, text: str) -> dict:
     }
 
 
+def direct_wechat_url(url: str) -> str | None:
+    match = re.search(r"https?://mp\.weixin\.qq\.com/s/[A-Za-z0-9_-]+", url or "")
+    return match.group(0) if match else None
+
+
+def resolve_source_url(url: str) -> str:
+    """Resolve temporary Sogou WeChat redirects to stable article URLs."""
+    direct = direct_wechat_url(url)
+    if direct:
+        return direct
+    if "weixin.sogou.com/link" not in (url or ""):
+        return url
+    try:
+        request = Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 competitor-intel-bot/0.1",
+                "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+            },
+        )
+        with urlopen(request, timeout=10) as response:
+            resolved = direct_wechat_url(response.geturl())
+            if resolved:
+                return resolved
+            body = response.read(180_000).decode("utf-8", "ignore")
+            resolved = direct_wechat_url(html.unescape(body))
+            return resolved or url
+    except Exception:
+        return url
+
+
+def source_identity(source: dict) -> str:
+    name = re.sub(r"\s+", " ", str(source.get("name") or "来源")).strip().lower()
+    host = re.sub(r"^https?://", "", str(source.get("url") or "")).split("/", 1)[0].lower()
+    host = re.sub(r"^www\.", "", host)
+    return f"{name}|{host}"
+
+
+def source_priority(source: dict) -> int:
+    url = str(source.get("url") or "")
+    if direct_wechat_url(url):
+        return 3
+    if "weixin.sogou.com/link" in url:
+        return 1
+    return 2
+
+
+def dedupe_sources(sources: list[dict]) -> list[dict]:
+    by_identity: dict[str, dict] = {}
+    for source in sources:
+        if not source.get("url"):
+            continue
+        key = source_identity(source)
+        existing = by_identity.get(key)
+        if existing is None or source_priority(source) > source_priority(existing):
+            by_identity[key] = source
+    deduped = list(by_identity.values())
+    stable_names = {
+        re.sub(r"\s+", " ", str(source.get("name") or "来源")).strip().lower()
+        for source in deduped
+        if source_priority(source) > 1
+    }
+    return [
+        source for source in deduped
+        if source_priority(source) > 1
+        or re.sub(r"\s+", " ", str(source.get("name") or "来源")).strip().lower() not in stable_names
+    ]
+
+
 def source_name(url: str) -> str:
     for domain, source in SOURCE_LOOKUP.items():
         if domain in url:
@@ -888,7 +957,7 @@ def merge_candidates(candidates: list[dict]) -> list[dict]:
         key = normalized_event_key(candidate)
         candidate["eventKey"] = key
         if key not in index:
-            candidate["sources"] = candidate.get("sources") or [source_object(candidate.get("sourceUrl", ""), candidate.get("title", ""))]
+            candidate["sources"] = dedupe_sources(candidate.get("sources") or [source_object(candidate.get("sourceUrl", ""), candidate.get("title", ""))])
             candidate["sourceCount"] = len(candidate["sources"])
             digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
             candidate["id"] = f"event-{digest}"
@@ -896,12 +965,10 @@ def merge_candidates(candidates: list[dict]) -> list[dict]:
             merged.append(candidate)
             continue
         existing = index[key]
-        existing_sources = existing.setdefault("sources", [])
-        known_urls = {source.get("url") for source in existing_sources}
-        for source in candidate.get("sources", []):
-            if source.get("url") and source.get("url") not in known_urls:
-                existing_sources.append(source)
-                known_urls.add(source.get("url"))
+        existing_sources = dedupe_sources(existing.setdefault("sources", []))
+        existing_sources.extend(candidate.get("sources", []))
+        existing_sources = dedupe_sources(existing_sources)
+        existing["sources"] = existing_sources
         existing["sourceCount"] = len(existing_sources)
         existing["score"] = min(99, max(existing.get("score", 0), candidate.get("score", 0)) + min(8, len(existing_sources) - 1))
         if candidate.get("date", "") > existing.get("date", ""):
@@ -999,6 +1066,10 @@ def collect_candidates() -> list[dict]:
             except Exception as exc:  # keep the daily job resilient
                 print(f"[warn] {engine} {query}: {exc}")
         for candidate in candidates:
+            resolved_url = resolve_source_url(candidate.get("sourceUrl", ""))
+            if resolved_url != candidate.get("sourceUrl"):
+                candidate["sourceUrl"] = resolved_url
+                candidate["sources"] = [source_object(resolved_url, f"{candidate.get('title', '')} {candidate.get('summary', '')}")]
             if "mp.weixin.qq.com" in candidate.get("sourceUrl", "") and candidate.get("score", 0) >= 60:
                 candidate = enrich_wechat_candidate(candidate)
             today = datetime.now(CN_TZ).date().isoformat()
