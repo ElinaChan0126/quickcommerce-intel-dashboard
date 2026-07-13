@@ -15,10 +15,9 @@ cat > "$PLIST" <<PLIST
   <string>com.quickcommerce.intel.daily</string>
   <key>ProgramArguments</key>
   <array>
+    <string>/bin/bash</string>
     <string>$ROOT_DIR/scripts/run-local-daily-update.sh</string>
   </array>
-  <key>WorkingDirectory</key>
-  <string>$ROOT_DIR</string>
   <key>StartCalendarInterval</key>
   <array>
     <dict>
