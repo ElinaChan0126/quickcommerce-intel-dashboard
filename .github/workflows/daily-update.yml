@@ -24,8 +24,26 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Refresh candidate intel
         run: python auto_update_intel.py --dashboard index.html
+
+      - name: Refresh WeChat source links
+        run: |
+          CHROME_BIN="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME_BIN" ]; then
+            echo "Chrome is not available on this runner; keeping temporary WeChat links."
+            exit 0
+          fi
+          node scripts/scrape-wechat-chrome.cjs \
+            --from-dashboard \
+            --dashboard index.html \
+            --chrome "$CHROME_BIN" \
+            --limit 20 || echo "Some WeChat links could not be refreshed this run."
 
       - name: Commit changes
         run: |

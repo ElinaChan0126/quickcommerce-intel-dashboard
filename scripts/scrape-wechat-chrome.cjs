@@ -142,6 +142,15 @@ function candidateHash(...parts) {
   return crypto.createHash("sha1").update(parts.filter(Boolean).join("|")).digest("hex").slice(0, 12);
 }
 
+function isDirectWechatUrl(url) {
+  return /^https?:\/\/mp\.weixin\.qq\.com\/s\//.test(String(url || ""));
+}
+
+function isWechatSourceUrl(url) {
+  const value = String(url || "");
+  return isDirectWechatUrl(value) || value.includes("weixin.sogou.com/link");
+}
+
 function platformFromText(text) {
   const rules = [
     ["淘宝闪购", ["淘宝闪购", "淘宝买菜", "饿了么"]],
@@ -327,6 +336,52 @@ function readDashboardBlock(dashboardPath) {
   };
 }
 
+function replaceDashboardWechatUrl(dashboardPath, oldUrl, nextUrl) {
+  if (!isDirectWechatUrl(nextUrl) || oldUrl === nextUrl) return false;
+  const original = fs.readFileSync(dashboardPath, "utf8");
+  const block = readDashboardBlock(dashboardPath);
+  let changed = false;
+  for (const item of block.candidates) {
+    if (item.sourceUrl === oldUrl) {
+      item.sourceUrl = nextUrl;
+      changed = true;
+    }
+    if (!Array.isArray(item.sources)) continue;
+    const seen = new Set();
+    item.sources = item.sources.filter(source => {
+      if (!source || source.url !== oldUrl) return true;
+      source.url = nextUrl;
+      const key = `${source.name || "来源"}|${source.url}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      changed = true;
+      return true;
+    });
+  }
+  if (!changed) return false;
+  const nextMeta = {
+    ...block.meta,
+    sourceRefreshAt: new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date()),
+  };
+  const replacement = [
+    "    // AUTO_CANDIDATES_START",
+    `    const generatedCandidates = ${JSON.stringify(block.candidates, null, 6)};`,
+    `    const generatedMeta = ${JSON.stringify(nextMeta)};`,
+    "    // AUTO_CANDIDATES_END",
+  ].join("\n");
+  const next = original.replace(/    \/\/ AUTO_CANDIDATES_START\n[\s\S]*?    \/\/ AUTO_CANDIDATES_END/, replacement);
+  fs.writeFileSync(dashboardPath, next, "utf8");
+  return true;
+}
+
 function pendingWechatUrls(dashboardPath, limit) {
   const { candidates } = readDashboardBlock(dashboardPath);
   const urls = [];
@@ -336,7 +391,7 @@ function pendingWechatUrls(dashboardPath, limit) {
     const isAlreadyFullText = item.needsFullText === false && /本地已读全文|已补全文/.test(`${item.contentStatus || ""} ${item.fullTextStatus || ""}`);
     if (isAlreadyFullText) continue;
     for (const sourceUrl of sourceUrls) {
-      if (!sourceUrl.includes("mp.weixin.qq.com")) continue;
+      if (!isWechatSourceUrl(sourceUrl)) continue;
       if (!urls.includes(sourceUrl)) urls.push(sourceUrl);
       if (limit && urls.length >= limit) return urls;
     }
@@ -348,7 +403,7 @@ function scrapeDashboardWechatLinks(dashboardPath, limit) {
   const urls = pendingWechatUrls(dashboardPath, limit);
   const results = [];
   urls.forEach((wechatUrl, index) => {
-    const child = spawnSync(process.execPath, [
+    const childArgs = [
       __filename,
       "--url",
       wechatUrl,
@@ -356,7 +411,11 @@ function scrapeDashboardWechatLinks(dashboardPath, limit) {
       dashboardPath,
       "--port",
       String(9227 + index),
-    ], {
+    ];
+    // Temporary Sogou links are refreshed in place; direct WeChat links keep
+    // the existing full-text candidate behavior.
+    if (wechatUrl.includes("weixin.sogou.com/link")) childArgs.push("--no-inject");
+    const child = spawnSync(process.execPath, childArgs, {
       cwd: path.dirname(dashboardPath),
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
@@ -372,15 +431,21 @@ function scrapeDashboardWechatLinks(dashboardPath, limit) {
       ok: child.status === 0 && Boolean(parsed && parsed.ok),
       status: child.status,
       title: parsed && parsed.title,
+      resolvedUrl: parsed && parsed.resolvedUrl,
       candidateCount: parsed && parsed.candidateCount,
       stderr: child.stderr ? child.stderr.trim().slice(0, 500) : "",
     });
   });
+  const refreshed = results.filter(result => {
+    if (!result.resolvedUrl || !isDirectWechatUrl(result.resolvedUrl)) return false;
+    return replaceDashboardWechatUrl(dashboardPath, result.url, result.resolvedUrl);
+  });
   return {
-    ok: results.every(result => result.ok),
+    ok: results.length > 0 && refreshed.length > 0,
     scanned: urls.length,
     success: results.filter(result => result.ok).length,
     failed: results.filter(result => !result.ok).length,
+    refreshed: refreshed.length,
     results,
   };
 }
@@ -405,8 +470,8 @@ async function main() {
     if (result.failed) process.exitCode = 1;
     return;
   }
-  if (!url || !url.includes("mp.weixin.qq.com")) {
-    throw new Error("Usage: node scripts/scrape-wechat-chrome.cjs --url https://mp.weixin.qq.com/s/...");
+  if (!url || !isWechatSourceUrl(url)) {
+    throw new Error("Usage: node scripts/scrape-wechat-chrome.cjs --url https://mp.weixin.qq.com/s/... or a Sogou WeChat link");
   }
   if (!fs.existsSync(chromePath)) {
     throw new Error(`Chrome not found: ${chromePath}`);
@@ -483,6 +548,7 @@ async function main() {
       ok: article.ok,
       title: article.title,
       account: article.account,
+      resolvedUrl: article.url,
       candidateCount: candidates.length,
       injected,
       saved,
