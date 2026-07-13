@@ -1121,6 +1121,21 @@ def inject_candidates(dashboard: Path, candidates: list[dict]) -> None:
     dashboard.write_text(pattern.sub(block, text), encoding="utf-8")
 
 
+def has_existing_generated_candidates(dashboard: Path) -> bool:
+    text = dashboard.read_text(encoding="utf-8")
+    match = re.search(
+        r"const generatedCandidates\s*=\s*(\[.*?\]);\s*const generatedMeta",
+        text,
+        flags=re.S,
+    )
+    if not match:
+        return False
+    try:
+        return bool(json.loads(match.group(1)))
+    except json.JSONDecodeError:
+        return False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Update quick-commerce intel candidates.")
     parser.add_argument("--dashboard", type=Path, default=DASHBOARD, help="Dashboard HTML path.")
@@ -1131,6 +1146,8 @@ def main() -> None:
     if args.dry_run:
         print(json.dumps(candidates, ensure_ascii=False, indent=2))
         return
+    if not candidates and has_existing_generated_candidates(args.dashboard):
+        raise RuntimeError("本次未获取到候选，保留现有候选池；请检查网络或搜索源后重试。")
     inject_candidates(args.dashboard, candidates)
     print(f"updated {args.dashboard} with {len(candidates)} candidates")
 
