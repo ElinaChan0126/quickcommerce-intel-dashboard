@@ -483,11 +483,6 @@ def clean_text(value: str) -> str:
     return value
 
 
-def wechat_query_worthy(query: str) -> bool:
-    compact = re.sub(r"\s+", "", query)
-    return "mp.weixin.qq.com" in query or any(re.sub(r"\s+", "", account) in compact for account in HIGH_SIGNAL_ACCOUNTS)
-
-
 def source_object(url: str, text: str) -> dict:
     return {
         "name": source_name_from_text(url, text),
@@ -501,29 +496,16 @@ def direct_wechat_url(url: str) -> str | None:
 
 
 def resolve_source_url(url: str) -> str:
-    """Resolve temporary Sogou WeChat redirects to stable article URLs."""
+    """Return a stable article URL when one is already present.
+
+    Search-engine redirect URLs are intentionally left untouched here. They
+    are not reliable article sources and must not be handed to a browser
+    refresh loop.
+    """
     direct = direct_wechat_url(url)
     if direct:
         return direct
-    if "weixin.sogou.com/link" not in (url or ""):
-        return url
-    try:
-        request = Request(
-            url,
-            headers={
-                "User-Agent": "Mozilla/5.0 competitor-intel-bot/0.1",
-                "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
-            },
-        )
-        with urlopen(request, timeout=10) as response:
-            resolved = direct_wechat_url(response.geturl())
-            if resolved:
-                return resolved
-            body = response.read(180_000).decode("utf-8", "ignore")
-            resolved = direct_wechat_url(html.unescape(body))
-            return resolved or url
-    except Exception:
-        return url
+    return url
 
 
 def source_identity(source: dict) -> str:
@@ -537,8 +519,6 @@ def source_priority(source: dict) -> int:
     url = str(source.get("url") or "")
     if direct_wechat_url(url):
         return 3
-    if "weixin.sogou.com/link" in url:
-        return 1
     return 2
 
 
@@ -1014,31 +994,6 @@ def parse_so_results(html_text: str) -> list[dict]:
     return candidates
 
 
-def parse_sogou_weixin_results(html_text: str) -> list[dict]:
-    candidates = []
-    blocks = re.findall(r'<li[^>]+id="sogou_vr_.*?</li>', html_text, flags=re.S)
-    if not blocks:
-        blocks = re.findall(r'<li[^>]*>.*?</li>', html_text, flags=re.S)
-    for block in blocks:
-        title_match = re.search(r'<h3[^>]*>.*?<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>.*?</h3>', block, flags=re.S)
-        if not title_match:
-            continue
-        raw_link = html.unescape(title_match.group(1))
-        if raw_link.startswith("/"):
-            raw_link = "https://weixin.sogou.com" + raw_link
-        title = clean_text(title_match.group(2))
-        account_match = re.search(r'<a[^>]+uigs="account_name_[^"]*"[^>]*>(.*?)</a>', block, flags=re.S)
-        account = clean_text(account_match.group(1)) if account_match else ""
-        desc_match = re.search(r'<p[^>]+class="txt-info"[^>]*>(.*?)</p>', block, flags=re.S)
-        description = clean_text(desc_match.group(1)) if desc_match else ""
-        date_match = re.search(r'(\d{4}-\d{1,2}-\d{1,2})', block)
-        pub_date = date_match.group(1) if date_match else ""
-        text = f"{account} {description}".strip()
-        if title and raw_link:
-            candidates.extend(candidates_from_result(title, text, raw_link, pub_date))
-    return candidates
-
-
 def collect_candidates() -> list[dict]:
     seen = set()
     collected = []
@@ -1049,8 +1004,6 @@ def collect_candidates() -> list[dict]:
             ("bing", "https://www.bing.com/search?format=rss&q=" + quote(query)),
             ("so", "https://www.so.com/s?q=" + quote(query)),
         ]
-        if wechat_query_worthy(query):
-            urls.append(("sogou_weixin", "https://weixin.sogou.com/weixin?type=2&query=" + quote(query.replace("site:mp.weixin.qq.com/s", ""))))
         for engine, url in urls:
             try:
                 body = fetch(url)
@@ -1058,8 +1011,6 @@ def collect_candidates() -> list[dict]:
                     candidates.extend(parse_bing_rss(body))
                 elif engine == "so":
                     candidates.extend(parse_so_results(body))
-                else:
-                    candidates.extend(parse_sogou_weixin_results(body))
             except Exception as exc:  # keep the daily job resilient
                 print(f"[warn] {engine} {query}: {exc}")
         for candidate in candidates:
@@ -1081,6 +1032,11 @@ def collect_candidates() -> list[dict]:
             if candidate_date < cutoff:
                 continue
             if any(part in candidate["sourceUrl"] for part in EXCLUDED_URL_PARTS):
+                continue
+            if "weixin.sogou.com/link" in candidate.get("sourceUrl", ""):
+                # Sogou links are expiring search redirects, not article
+                # URLs. Keep the candidate out until a direct WeChat URL is
+                # discovered by a supported search source.
                 continue
             if any(word in candidate["title"] for word in ["最新相关消息", "外卖券", "优惠券", "领券"]):
                 continue

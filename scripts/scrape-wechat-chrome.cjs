@@ -147,8 +147,7 @@ function isDirectWechatUrl(url) {
 }
 
 function isWechatSourceUrl(url) {
-  const value = String(url || "");
-  return isDirectWechatUrl(value) || value.includes("weixin.sogou.com/link");
+  return isDirectWechatUrl(url);
 }
 
 function platformFromText(text) {
@@ -412,9 +411,6 @@ function scrapeDashboardWechatLinks(dashboardPath, limit) {
       "--port",
       String(9227 + index),
     ];
-    // Temporary Sogou links are refreshed in place; direct WeChat links keep
-    // the existing full-text candidate behavior.
-    if (wechatUrl.includes("weixin.sogou.com/link")) childArgs.push("--no-inject");
     const child = spawnSync(process.execPath, childArgs, {
       cwd: path.dirname(dashboardPath),
       encoding: "utf8",
@@ -477,7 +473,7 @@ async function main() {
     return;
   }
   if (!url || !isWechatSourceUrl(url)) {
-    throw new Error("Usage: node scripts/scrape-wechat-chrome.cjs --url https://mp.weixin.qq.com/s/... or a Sogou WeChat link");
+    throw new Error("Usage: node scripts/scrape-wechat-chrome.cjs --url https://mp.weixin.qq.com/s/...");
   }
   if (!fs.existsSync(chromePath)) {
     throw new Error(`Chrome not found: ${chromePath}`);
