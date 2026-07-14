@@ -1094,21 +1094,53 @@ def collect_candidates() -> list[dict]:
     return merge_candidates(collected)[:20]
 
 
+def read_existing_generated_candidates(dashboard: Path) -> list[dict]:
+    text = dashboard.read_text(encoding="utf-8")
+    match = re.search(
+        r"const generatedCandidates\s*=\s*(\[.*?\]);\s*const generatedMeta",
+        text,
+        flags=re.S,
+    )
+    if not match:
+        return []
+    try:
+        value = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return []
+    return value if isinstance(value, list) else []
+
+
+def recent_candidates(candidates: list[dict]) -> list[dict]:
+    cutoff = (datetime.now(CN_TZ) - timedelta(days=RECENT_DAYS)).date()
+    kept = []
+    for candidate in candidates:
+        try:
+            candidate_date = datetime.fromisoformat(candidate.get("date", "")).date()
+        except (TypeError, ValueError):
+            candidate_date = datetime.now(CN_TZ).date()
+        if candidate_date >= cutoff:
+            kept.append(candidate)
+    return kept
+
+
 def inject_candidates(dashboard: Path, candidates: list[dict]) -> None:
     text = dashboard.read_text(encoding="utf-8")
+    existing = read_existing_generated_candidates(dashboard)
+    merged = recent_candidates(merge_candidates(existing + candidates))
     updated_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
     meta = {
         "updatedAt": updated_at,
         "sourceCount": source_inventory_count(),
         "queryCount": len(build_queries()),
-        "candidateCount": len(candidates),
+        "candidateCount": len(merged),
+        "newCandidateCount": len(candidates),
         "retentionDays": RECENT_DAYS,
         "status": "completed",
         "sourceWeights": source_weight_inventory(),
     }
     block = (
         "    // AUTO_CANDIDATES_START\n"
-        f"    const generatedCandidates = {json.dumps(candidates, ensure_ascii=False, indent=6)};\n"
+        f"    const generatedCandidates = {json.dumps(merged, ensure_ascii=False, indent=6)};\n"
         f"    const generatedMeta = {json.dumps(meta, ensure_ascii=False)};\n"
         "    // AUTO_CANDIDATES_END"
     )
@@ -1122,18 +1154,7 @@ def inject_candidates(dashboard: Path, candidates: list[dict]) -> None:
 
 
 def has_existing_generated_candidates(dashboard: Path) -> bool:
-    text = dashboard.read_text(encoding="utf-8")
-    match = re.search(
-        r"const generatedCandidates\s*=\s*(\[.*?\]);\s*const generatedMeta",
-        text,
-        flags=re.S,
-    )
-    if not match:
-        return False
-    try:
-        return bool(json.loads(match.group(1)))
-    except json.JSONDecodeError:
-        return False
+    return bool(read_existing_generated_candidates(dashboard))
 
 
 def main() -> None:
@@ -1149,7 +1170,8 @@ def main() -> None:
     if not candidates and has_existing_generated_candidates(args.dashboard):
         raise RuntimeError("本次未获取到候选，保留现有候选池；请检查网络或搜索源后重试。")
     inject_candidates(args.dashboard, candidates)
-    print(f"updated {args.dashboard} with {len(candidates)} candidates")
+    retained = len(read_existing_generated_candidates(args.dashboard))
+    print(f"updated {args.dashboard} with {len(candidates)} new candidates; {retained} retained candidates")
 
 
 if __name__ == "__main__":
