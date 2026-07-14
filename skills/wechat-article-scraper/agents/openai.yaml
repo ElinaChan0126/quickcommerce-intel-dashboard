@@ -1,0 +1,7 @@
+interface:
+  display_name: "微信公众号情报抓取"
+  short_description: "抓取公众号正文并提取即时配送相关候选事件"
+  default_prompt: "Use $wechat-article-scraper to抓取公众号直链，提取正文并将即时配送事件写入候选池。"
+
+policy:
+  allow_implicit_invocation: true

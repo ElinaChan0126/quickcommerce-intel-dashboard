@@ -29,4 +29,9 @@ if [[ ! -x "$NODE_BIN" ]]; then
 fi
 
 cd "$ROOT_DIR"
-"$NODE_BIN" scripts/scrape-wechat-chrome.cjs "${EXTRA_ARGS[@]}"
+SKILL_SCRIPT="$ROOT_DIR/skills/wechat-article-scraper/scripts/scrape-wechat.js"
+if [[ -x "$SKILL_SCRIPT" ]]; then
+  "$NODE_BIN" "$SKILL_SCRIPT" "${EXTRA_ARGS[@]}"
+else
+  "$NODE_BIN" scripts/scrape-wechat-chrome.cjs "${EXTRA_ARGS[@]}"
+fi

@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$ROOT_DIR/logs"
 LOG_FILE="$LOG_DIR/local-daily-update.log"
+NODE_BIN="/Users/yilin.chenyl/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node"
 PYTHON_BIN="${PYTHON_BIN:-/usr/bin/python3}"
 
 mkdir -p "$LOG_DIR"
@@ -12,6 +13,15 @@ exec >>"$LOG_FILE" 2>&1
 echo ""
 echo "===== $(date '+%Y-%m-%d %H:%M:%S') local daily update start ====="
 cd "$ROOT_DIR"
+
+if [[ ! -x "$NODE_BIN" ]]; then
+  if command -v node >/dev/null 2>&1; then
+    NODE_BIN="$(command -v node)"
+  else
+    echo "Node.js not found; skipping WeChat Skill refresh."
+    NODE_BIN=""
+  fi
+fi
 
 if command -v git >/dev/null 2>&1; then
   if git diff --quiet && git diff --cached --quiet; then
@@ -22,10 +32,11 @@ if command -v git >/dev/null 2>&1; then
 fi
 
 "$PYTHON_BIN" auto_update_intel.py --dashboard index.html || echo "Web search failed; keeping existing candidates and skipping browser-based WeChat refresh."
-if [[ -n "${WECHAT_SKILL_DIR:-}" && -f "${WECHAT_SKILL_DIR}/SKILL.md" && -f "${WECHAT_SKILL_DIR}/scripts/scrape-wechat.js" ]]; then
-  echo "WeChat Skill detected at ${WECHAT_SKILL_DIR}, but its adapter is not configured yet; skipping browser refresh."
+WECHAT_SKILL="$ROOT_DIR/skills/wechat-article-scraper/scripts/scrape-wechat.js"
+if [[ -f "$WECHAT_SKILL" && -n "$NODE_BIN" ]]; then
+  "$NODE_BIN" "$WECHAT_SKILL" --from-dashboard --dashboard index.html --limit "${WECHAT_LIMIT:-8}" || echo "Some WeChat full-text fetches failed; keeping successful candidates."
 else
-  echo "WeChat Skill is not installed; skipping WeChat refresh. No Chrome or Sogou process will be started."
+  echo "Project WeChat Skill is missing; skipping WeChat refresh."
 fi
 
 if git diff --quiet -- index.html; then

@@ -480,7 +480,7 @@ async function main() {
   }
   if (shouldSaveFiles) fs.mkdirSync(outDir, { recursive: true });
   const userDataDir = path.join("/private/tmp", `wechat-chrome-${Date.now()}`);
-  const chrome = spawn(chromePath, [
+  const chromeArgs = [
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${userDataDir}`,
     "--no-first-run",
@@ -492,7 +492,9 @@ async function main() {
     "--disable-sync",
     "--window-size=1280,1600",
     "about:blank",
-  ], { stdio: ["ignore", "ignore", "pipe"] });
+  ];
+  if (process.env.WECHAT_HEADLESS === "1") chromeArgs.unshift("--headless=new");
+  const chrome = spawn(chromePath, chromeArgs, { stdio: ["ignore", "ignore", "pipe"] });
   let stderr = "";
   chrome.stderr.on("data", chunk => stderr += chunk.toString());
   try {
