@@ -419,6 +419,10 @@ function scrapeDashboardWechatLinks(dashboardPath, limit) {
       cwd: path.dirname(dashboardPath),
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
+      // A blocked Chrome/CDP session must not prevent the daily job from
+      // committing the web and Xiaohongshu results.
+      timeout: Number(process.env.WECHAT_ITEM_TIMEOUT_MS || 30000),
+      killSignal: "SIGTERM",
     });
     let parsed = null;
     try {
@@ -433,7 +437,9 @@ function scrapeDashboardWechatLinks(dashboardPath, limit) {
       title: parsed && parsed.title,
       resolvedUrl: parsed && parsed.resolvedUrl,
       candidateCount: parsed && parsed.candidateCount,
-      stderr: child.stderr ? child.stderr.trim().slice(0, 500) : "",
+      stderr: child.error
+        ? `${child.error.code || child.error.message || "child process error"}${child.stderr ? `: ${child.stderr.trim()}` : ""}`.slice(0, 500)
+        : (child.stderr ? child.stderr.trim().slice(0, 500) : ""),
     });
   });
   const refreshed = results.filter(result => {
