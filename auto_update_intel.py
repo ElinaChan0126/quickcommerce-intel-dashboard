@@ -70,7 +70,6 @@ DATA_SOURCES = [
     {"name": "京东到家官网", "domain": "jddj.com", "focus": "即时零售、商超便利、平台活动", "weight": 8},
     {"name": "饿了么官网", "domain": "ele.me", "focus": "本地生活、蜂鸟即配、平台活动", "weight": 8},
     {"name": "公众号索引", "domain": "mp.weixin.qq.com", "focus": "平台官方、技术团队、行业自媒体", "weight": 5},
-    {"name": "小红书", "domain": "xiaohongshu.com", "focus": "用户侧体验、平台活动、即时配送讨论", "weight": 5},
 ]
 
 WECHAT_ACCOUNTS = {
@@ -152,8 +151,6 @@ HIGH_SIGNAL_ACCOUNTS = [
 ]
 
 PLATFORM_SEARCH_TERMS = [
-    "小红书 即时零售 闪购 外卖 秒送",
-    "小红书 美团闪购 淘宝闪购 京东秒送",
     "美团众包骑手APP 新功能",
     "蜂鸟众包APP 新功能",
 ]
@@ -287,7 +284,7 @@ def source_weight_inventory() -> list[dict]:
             "channel": "平台/APP搜索",
             "weight": 5,
             "basis": "平台搜索词命中加分",
-            "detail": "用于补充小红书、骑手 APP 等非网页渠道线索",
+            "detail": "用于补充骑手 APP 等非网页渠道线索",
         })
     for channel in NEWS_SEARCH_CHANNELS:
         rows.append({
