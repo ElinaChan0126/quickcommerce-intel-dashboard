@@ -718,34 +718,24 @@ def parse_absolute_date(text: str) -> str | None:
     return None
 
 
+def parse_html_date(value: str) -> str | None:
+    raw = html.unescape(str(value or "")).strip()
+    timestamp = re.search(r"(?<!\d)(1\d{9}|20\d{9})(?!\d)", raw)
+    if timestamp:
+        try:
+            return datetime.fromtimestamp(int(timestamp.group(1)), CN_TZ).date().isoformat()
+        except (OverflowError, OSError, ValueError):
+            pass
+    iso = re.search(r"(20\d{2}-[01]\d-[0-3]\d)", raw)
+    if iso:
+        return iso.group(1)
+    return parse_absolute_date(raw)
+
+
 def parse_date(pub_date: str, text: str) -> str:
-    absolute = parse_absolute_date(text)
-    if absolute:
-        return absolute
-    relative = re.search(r"(\d+)\s*(分钟前|小时前|天前)", text)
-    if relative:
-        amount = int(relative.group(1))
-        unit = relative.group(2)
-        now = datetime.now(CN_TZ)
-        if unit == "分钟前":
-            return now.date().isoformat()
-        if unit == "小时前":
-            return now.date().isoformat()
-        if unit == "天前":
-            return (now - timedelta(days=amount)).date().isoformat()
-    if pub_date:
-        parsed = None
-        for fmt in ["%a, %d %b %Y %H:%M:%S %Z", "%a, %d %b %Y %H:%M:%S %z"]:
-            try:
-                parsed = datetime.strptime(pub_date, fmt)
-                break
-            except ValueError:
-                pass
-        if parsed:
-            return parsed.astimezone(CN_TZ).date().isoformat()
-    # 不要把“没有识别到日期”伪装成今天，否则搜索摘要中的旧内容会
-    # 被错误地当作当天线索进入候选池。
-    return ""
+    # 搜索摘要和 RSS pubDate 可能是抓取/索引时间，不能当作文章发布时间。
+    # 这里只接受标题中明确写出的完整日期；最终以来源页元数据为准。
+    return parse_absolute_date(text) or ""
 
 
 def source_date(url: str) -> str | None:
@@ -753,9 +743,31 @@ def source_date(url: str) -> str | None:
         body = fetch(url, timeout=12)
     except Exception:
         return None
-    text = re.sub(r"<script.*?</script>|<style.*?</style>", " ", body, flags=re.S)
-    text = clean_text(text)
-    return parse_absolute_date(text)
+
+    # 优先读取结构化发布时间，避免把正文里的年份误判为文章日期。
+    for tag in re.findall(r"<meta\b[^>]*>", body, flags=re.I):
+        attrs = dict(re.findall(r"""([:\w-]+)\s*=\s*["']([^"']*)["']""", tag))
+        key = (attrs.get("property") or attrs.get("name") or attrs.get("itemprop") or "").lower()
+        if key in {"article:published_time", "datepublished", "datecreated", "publishdate", "pubdate"}:
+            parsed = parse_html_date(attrs.get("content", ""))
+            if parsed:
+                return parsed
+
+    for key in ["datePublished", "dateCreated", "publishTime", "publishedAt"]:
+        for value in re.findall(rf"""["']{key}["']\s*:\s*["']([^"']+)""", body, flags=re.I):
+            parsed = parse_html_date(value)
+            if parsed:
+                return parsed
+
+    for value in re.findall(r"""<time\b[^>]*datetime=["']([^"']+)""", body, flags=re.I):
+        parsed = parse_html_date(value)
+        if parsed:
+            return parsed
+
+    ct_match = re.search(r"""\bct\s*=\s*["']?(\d{9,})""", body)
+    if ct_match:
+        return parse_html_date(ct_match.group(1))
+    return None
 
 
 def candidate_id(url: str, title: str) -> str:
@@ -839,7 +851,7 @@ def make_candidate(title: str, description: str, link: str, pub_date: str = "") 
     is_wechat = "mp.weixin.qq.com" in link
     return {
         "id": candidate_id(link, title),
-        "date": parse_date(pub_date, f"{text} {link}"),
+        "date": parse_date(pub_date, title),
         "platform": platform_from_text(text),
         "title": title,
         "type": "自动候选",
@@ -1029,11 +1041,14 @@ def collect_candidates() -> list[dict]:
                     candidate_date = datetime.fromisoformat(candidate["date"]).date()
             except ValueError:
                 candidate_date = None
-            if (candidate_date is None or candidate_date == today) and candidate["score"] >= 80:
+            if "mp.weixin.qq.com" not in candidate.get("sourceUrl", "") and candidate["score"] >= 70:
                 actual_date = source_date(candidate["sourceUrl"])
                 if actual_date:
                     candidate["date"] = actual_date
                     candidate_date = datetime.fromisoformat(actual_date).date()
+                else:
+                    # 网页来源没有可验证的发布时间时，不使用搜索摘要日期兜底。
+                    candidate_date = None
             if candidate_date is None:
                 # 没有文章页或搜索结果提供可验证日期时，宁可不入池。
                 continue
@@ -1071,6 +1086,31 @@ def read_existing_generated_candidates(dashboard: Path) -> list[dict]:
     return value if isinstance(value, list) else []
 
 
+KNOWN_SOURCE_DATES = {
+    # 36氪这篇原文明确发表于 2023-07-12；旧版本曾把搜索摘要日期写成 2026-07-06。
+    "https://36kr.com/p/2340566436267400": "2023-07-12",
+    "https://www.36kr.com/p/2340566436267400": "2023-07-12",
+}
+
+
+def refresh_existing_candidate_dates(candidates: list[dict]) -> list[dict]:
+    for candidate in candidates:
+        if candidate.get("type") != "自动候选":
+            continue
+        url = candidate.get("sourceUrl", "")
+        if url in KNOWN_SOURCE_DATES:
+            candidate["date"] = KNOWN_SOURCE_DATES[url]
+            continue
+        if "mp.weixin.qq.com" in url:
+            continue
+        if candidate.get("score", 0) < 70 or not url:
+            continue
+        actual_date = source_date(url)
+        if actual_date:
+            candidate["date"] = actual_date
+    return candidates
+
+
 def recent_candidates(candidates: list[dict]) -> list[dict]:
     cutoff = (datetime.now(CN_TZ) - timedelta(days=RECENT_DAYS)).date()
     today = datetime.now(CN_TZ).date()
@@ -1094,7 +1134,7 @@ def recent_candidates(candidates: list[dict]) -> list[dict]:
 
 def inject_candidates(dashboard: Path, candidates: list[dict]) -> None:
     text = dashboard.read_text(encoding="utf-8")
-    existing = read_existing_generated_candidates(dashboard)
+    existing = refresh_existing_candidate_dates(read_existing_generated_candidates(dashboard))
     merged = recent_candidates(merge_candidates(existing + candidates))
     updated_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
     meta = {
