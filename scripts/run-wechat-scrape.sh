@@ -23,6 +23,12 @@ else
   NODE_BIN="/Users/yilin.chenyl/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node"
 fi
 
+PLAYWRIGHT_CHROME="$("$ROOT_DIR/scripts/resolve-wechat-chromium.sh" 2>/dev/null || true)"
+if [[ -n "$PLAYWRIGHT_CHROME" ]]; then
+  export PUPPETEER_EXECUTABLE_PATH="$PLAYWRIGHT_CHROME"
+  echo "Using Playwright Chromium: $PLAYWRIGHT_CHROME"
+fi
+
 if [[ ! -x "$NODE_BIN" ]]; then
   echo "Node.js not found. Please install Node.js or run this from Codex's prepared environment."
   exit 1

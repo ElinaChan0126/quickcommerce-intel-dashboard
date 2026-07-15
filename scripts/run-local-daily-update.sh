@@ -14,6 +14,12 @@ echo ""
 echo "===== $(date '+%Y-%m-%d %H:%M:%S') local daily update start ====="
 cd "$ROOT_DIR"
 
+PLAYWRIGHT_CHROME="$("$ROOT_DIR/scripts/resolve-wechat-chromium.sh" 2>/dev/null || true)"
+if [[ -n "$PLAYWRIGHT_CHROME" ]]; then
+  export PUPPETEER_EXECUTABLE_PATH="$PLAYWRIGHT_CHROME"
+  echo "Using Playwright Chromium: $PLAYWRIGHT_CHROME"
+fi
+
 if [[ ! -x "$NODE_BIN" ]]; then
   if command -v node >/dev/null 2>&1; then
     NODE_BIN="$(command -v node)"
