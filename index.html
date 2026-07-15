@@ -137,7 +137,7 @@
     .candidate-board { padding: 22px; }
     .candidate-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 16px; }
     .candidate-head h2 { margin-top: 6px; font-size: 22px; }
-    .candidate-list { display: grid; gap: 12px; }
+    .candidate-list { display: grid; gap: 12px; }\n    .collection-note { margin: 4px 0 0; color: var(--muted); font-size: 11px; text-align: right; }
     .crawl-status { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
     .crawl-stat { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 12px; }
     .crawl-stat span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; }
@@ -364,7 +364,7 @@
           <h2>网页与公众号线索统一展示，确认后再进入正式日报</h2>
         </div>
         <div class="module-actions">
-          <div class="badge"><span>候选更新时间</span><strong id="candidate-updated">待运行</strong></div>
+          <p class="collection-note" id="candidate-updated">最近抓取：待运行</p>
         </div>
       </div>
       <div class="crawl-status collapsible-content" id="crawl-status"></div>
@@ -485,7 +485,7 @@
     const generatedCandidates = [
       {
             "id": "event-6e2b4937e389",
-            "date": "2026-07-08",
+            "date": "2026-07-07",
             "platform": "顺丰同城",
             "title": "顺丰 同城 正式 接入 支付宝 AI 生态,打造 一句话叫 跑腿 新体验_京报网",
             "type": "自动候选",
@@ -527,7 +527,9 @@
             "buyerRelevance": 58,
             "relevanceReason": "买家下单/履约链路 / AI 买家入口 / 买家体验细节",
             "eventKey": "顺丰同城|AI入口|顺丰同城接入支付宝AI生态",
-            "sourceCount": 5
+            "sourceCount": 5,
+            "publishedDate": "2026-07-07",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-bf0a08102670",
@@ -562,7 +564,9 @@
             "buyerRelevance": 50,
             "relevanceReason": "买家下单/履约链路 / AI 买家入口",
             "eventKey": "支付宝|AI入口|支付宝|阿宝|AI生态",
-            "sourceCount": 2
+            "sourceCount": 2,
+            "publishedDate": "2026-07-08",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-0ca449309206",
@@ -596,68 +600,9 @@
             "buyerRelevance": 40,
             "relevanceReason": "买家入口或体验 / AI 买家入口",
             "eventKey": "闪送|AI入口|智能下单|上线|AI",
-            "sourceCount": 2
-      },
-      {
-            "id": "event-127b661fc4b0",
-            "date": "2026-07-15",
-            "platform": "京东秒送",
-            "title": "外卖 烧钱大战,烧不出赢家- 36氪",
-            "type": "自动候选",
-            "category": "待归类",
-            "businessTag": "Buyer",
-            "businessTags": [
-                  "Buyer"
-            ],
-            "summary": "3天前 - 国内 即时零售 APP行业MAU(月活跃用户)为5.51亿,同比增长6%;京东APP内的 京东 秒送 ( 外卖 ) 模块... 外卖 投入达250亿元;在此情况下, 未来 12个月内,即2025 年7 ...",
-            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
-            "sourceName": "36氪",
-            "sourceUrl": "https://www.36kr.com/p/3390935788362118",
-            "sources": [
-                  {
-                        "name": "36氪",
-                        "url": "https://www.36kr.com/p/3390935788362118"
-                  }
-            ],
-            "sourceKind": "网页",
-            "contentStatus": "已读摘要",
-            "needsFullText": false,
-            "score": 99,
-            "buyerRelevance": 36,
-            "relevanceReason": "买家下单/履约链路",
-            "eventKey": "京东秒送|待归类|即时零售|秒送|外卖|外卖烧钱大战烧不出赢家36氪3天前国",
-            "sourceCount": 1
-      },
-      {
-            "id": "event-fe36b77dd401",
-            "date": "2026-07-15",
-            "platform": "美团外卖",
-            "title": "即时零售 再升级, 美团 、阿里、抖音、京东激战流量入口-36氪",
-            "type": "自动候选",
-            "category": "待归类",
-            "businessTag": "Buyer",
-            "businessTags": [
-                  "Buyer",
-                  "S&R"
-            ],
-            "summary": "2026年7月6日 - 即时 零售,作为 外卖 业务组织能力的衍生品, 美团 、饿了么平台,正是复用了此前专送 外卖 的这支 运力大军 ,激活了万物到家的消费需求.以 美团 为例, 美团 外卖与...",
-            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
-            "sourceName": "36氪",
-            "sourceUrl": "https://m.36kr.com/p/2847873195334533",
-            "sources": [
-                  {
-                        "name": "36氪",
-                        "url": "https://m.36kr.com/p/2847873195334533"
-                  }
-            ],
-            "sourceKind": "网页",
-            "contentStatus": "已读摘要",
-            "needsFullText": false,
-            "score": 99,
-            "buyerRelevance": 36,
-            "relevanceReason": "买家下单/履约链路",
-            "eventKey": "美团外卖|待归类|升级|即时零售|外卖|即时零售再升级美团阿里抖音京东激战流",
-            "sourceCount": 1
+            "sourceCount": 2,
+            "publishedDate": "2026-06-25",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-9c67ed207513",
@@ -688,7 +633,9 @@
             "buyerRelevance": 40,
             "relevanceReason": "买家入口或体验 / AI 买家入口",
             "eventKey": "淘宝闪购|AI入口|上线|升级|AI|淘宝闪购上线行业首个支持语音搜索能力",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-07-15",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-9c179d1b22ed",
@@ -718,7 +665,9 @@
             "buyerRelevance": -12,
             "relevanceReason": "偏资本市场",
             "eventKey": "美团闪购|AI入口|开启|活动|AI|美团闪购联合茅台五粮液等品牌推出酒水",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-07-15",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-868e6a1ec6a1",
@@ -746,7 +695,9 @@
             "buyerRelevance": 0,
             "relevanceReason": "非买家侧优先",
             "eventKey": "美团跑腿|配送体验|发布|升级|跑腿|最前线丨美团发布美团闪购品牌想用外卖",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-07-15",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-5546f9c3b34b",
@@ -776,7 +727,9 @@
             "buyerRelevance": 36,
             "relevanceReason": "买家下单/履约链路",
             "eventKey": "达达快送|配送体验|即时配送|配送|小程序|达达快送与华润万家达成深度物流合作3",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-07-15",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-f81324e3c673",
@@ -807,7 +760,9 @@
             "buyerRelevance": 50,
             "relevanceReason": "买家下单/履约链路 / AI 买家入口",
             "eventKey": "闪送|AI入口|支付宝|阿宝|AI生态|服务商",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-07-07",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-7d4389628987",
@@ -837,7 +792,9 @@
             "buyerRelevance": 58,
             "relevanceReason": "买家下单/履约链路 / AI 买家入口 / 买家体验细节",
             "eventKey": "UU跑腿|AI入口|AI助手|跑腿Skill|Skill|自然语言|骑手",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-07-03",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-dd1f2f01b17c",
@@ -867,7 +824,9 @@
             "buyerRelevance": 36,
             "relevanceReason": "买家下单/履约链路",
             "eventKey": "美团闪购|配送体验|骑手|即时零售|闪购",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-07-02",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-d1c764363bd7",
@@ -897,7 +856,9 @@
             "buyerRelevance": 40,
             "relevanceReason": "买家入口或体验 / AI 买家入口",
             "eventKey": "闪送|AI入口|智能下单|自然语言|上线",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-06-28",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-0a8f7cffb2bd",
@@ -927,7 +888,9 @@
             "buyerRelevance": 36,
             "relevanceReason": "买家下单/履约链路",
             "eventKey": "美团跑腿|配送体验|跑腿|同城|秒送|2026同城配送10大名牌同城配送品",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-06-28",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-f0b26c01d689",
@@ -957,7 +920,9 @@
             "buyerRelevance": 58,
             "relevanceReason": "买家下单/履约链路 / AI 买家入口 / 买家体验细节",
             "eventKey": "闪送|AI入口|智能下单|AI|同城|未来商业2026年6月26日点评在同",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-06-26",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-da51c477deed",
@@ -987,7 +952,9 @@
             "buyerRelevance": 40,
             "relevanceReason": "买家入口或体验 / AI 买家入口",
             "eventKey": "闪送|AI入口|智能下单|上线|开启",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-06-25",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-64b102dce0dd",
@@ -1017,7 +984,9 @@
             "buyerRelevance": 44,
             "relevanceReason": "买家下单/履约链路 / 买家体验细节",
             "eventKey": "京东秒送|营销活动|秒送|最快9分钟送达618京东秒送文具品类",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-06-22",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-da3b00d9e2c1",
@@ -1048,7 +1017,9 @@
             "buyerRelevance": 36,
             "relevanceReason": "买家下单/履约链路",
             "eventKey": "淘宝闪购|营销活动|上线|启动|闪购|外卖平台新规公开征求意见美团京东淘宝",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-06-17",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-6523a501a1e5",
@@ -1078,7 +1049,9 @@
             "buyerRelevance": 40,
             "relevanceReason": "买家入口或体验 / AI 买家入口",
             "eventKey": "淘宝闪购|AI入口|上线|AI|闪购|上海电信联手淘宝闪购上线ai助餐服务",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-06-05",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-07f8ba94ec3a",
@@ -1106,35 +1079,9 @@
             "buyerRelevance": 0,
             "relevanceReason": "非买家侧优先",
             "eventKey": "闪送|配送体验|上线|接入|跑腿|滴滴货运上线快送业务已在200城开通",
-            "sourceCount": 1
-      },
-      {
-            "id": "event-d70a3c5e61b1",
-            "date": "2026-07-15",
-            "platform": "美团闪购",
-            "title": "即时零售 的本质,是零售 外卖 化-36氪",
-            "type": "自动候选",
-            "category": "待归类",
-            "businessTag": "",
-            "businessTags": [],
-            "summary": "2026年7月6日 - 2022年 美团 闪购规模占 即时 零售行业市场约50%份额,饿了么占 即时 零售市场约15%份额, 外卖 平台占即时零售市场65%份额。.几乎所有二级市场投资机构和 美团 、...",
-            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
-            "sourceName": "36氪",
-            "sourceUrl": "https://www.36kr.com/p/2340566436267400",
-            "sources": [
-                  {
-                        "name": "36氪",
-                        "url": "https://www.36kr.com/p/2340566436267400"
-                  }
-            ],
-            "sourceKind": "网页",
-            "contentStatus": "已读摘要",
-            "needsFullText": false,
-            "score": 94,
-            "buyerRelevance": 0,
-            "relevanceReason": "非买家侧优先",
-            "eventKey": "美团闪购|待归类|即时零售|闪购|外卖|即时零售的本质是零售外卖化36氪20",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-07-15",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-6d993ac78682",
@@ -1165,7 +1112,9 @@
             "buyerRelevance": 40,
             "relevanceReason": "买家入口或体验 / AI 买家入口",
             "eventKey": "支付宝|AI入口|支付宝|阿宝|启动",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-06-16",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-9ba315705c51",
@@ -1196,35 +1145,9 @@
             "buyerRelevance": 36,
             "relevanceReason": "买家下单/履约链路",
             "eventKey": "淘宝闪购|营销活动|上线|闪购|外卖|淘宝闪购外卖领取入口68月更新淘宝闪",
-            "sourceCount": 1
-      },
-      {
-            "id": "event-3e93dfc980b2",
-            "date": "2026-07-15",
-            "platform": "待识别平台",
-            "title": "即时零售 的本质,是零售 外卖 化- 36氪",
-            "type": "自动候选",
-            "category": "待归类",
-            "businessTag": "",
-            "businessTags": [],
-            "summary": "2026年7月6日 - 外卖 成为大众日常生活的一部分,改变了大众的 消费 习惯,美团彻底击败对手,站稳脚跟,然后它提出了万物到家的概念,并在2021年近一步将零售确定为公司 未来 1...",
-            "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
-            "sourceName": "36氪",
-            "sourceUrl": "https://www.36kr.com/p/2340566436267400",
-            "sources": [
-                  {
-                        "name": "36氪",
-                        "url": "https://www.36kr.com/p/2340566436267400"
-                  }
-            ],
-            "sourceKind": "网页",
-            "contentStatus": "已读摘要",
-            "needsFullText": false,
-            "score": 82,
-            "buyerRelevance": 0,
-            "relevanceReason": "非买家侧优先",
-            "eventKey": "待识别平台|待归类|即时零售|外卖|即时零售的本质是零售外卖化36氪20",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-06-24",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-062efaef1295",
@@ -1254,7 +1177,9 @@
             "buyerRelevance": 0,
             "relevanceReason": "非买家侧优先",
             "eventKey": "淘宝闪购|营销活动|开启|闪购|外卖|外卖疯狂星期六有多烧钱美团单日补贴4",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-07-15",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-c2bcc0ee0996",
@@ -1282,7 +1207,9 @@
             "buyerRelevance": 0,
             "relevanceReason": "非买家侧优先",
             "eventKey": "美团跑腿|配送体验|跑腿|闪购|外卖|2026年主流会员体系盘点美团饿了么",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-07-02",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-d1e5f3ebe759",
@@ -1312,7 +1239,9 @@
             "buyerRelevance": 0,
             "relevanceReason": "非买家侧优先",
             "eventKey": "美团跑腿|配送体验|跑腿|闪购|外卖|2026年五大主流会员体系权益盘点美",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-07-01",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-28a5c4a65c2f",
@@ -1344,7 +1273,9 @@
             "buyerRelevance": 36,
             "relevanceReason": "买家下单/履约链路",
             "eventKey": "淘宝闪购|供给履约|闪购|外卖|淘宝闪购外卖券领取入口最新2026年",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-06-25",
+            "collectedAt": "2026-07-15 15:31"
       },
       {
             "id": "event-2314b7e74643",
@@ -1372,10 +1303,12 @@
             "buyerRelevance": 0,
             "relevanceReason": "非买家侧优先",
             "eventKey": "待识别平台|营销活动|即时零售|2026上半年零售观察消费理由越来越",
-            "sourceCount": 1
+            "sourceCount": 1,
+            "publishedDate": "2026-07-15",
+            "collectedAt": "2026-07-15 15:31"
       }
 ];
-    const generatedMeta = {"updatedAt": "2026-07-15 14:51", "sourceCount": 114, "queryCount": 184, "candidateCount": 29, "newCandidateCount": 20, "retentionDays": 45, "status": "completed", "sourceWeights": [{"name": "36氪", "channel": "网页/官网", "weight": 10, "basis": "域名命中加分", "detail": "36kr.com · 即时零售、平台战略、融资快讯"}, {"name": "淘宝闪购商家中心", "channel": "公众号 · 商家端", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "美团外卖商家中心", "channel": "公众号 · 商家端", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "美团闪购商家中心", "channel": "公众号 · 商家端", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "京东秒送", "channel": "公众号 · 平台官方", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "京东黑板报", "channel": "公众号 · 平台官方", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "美团外卖", "channel": "公众号 · 平台官方", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "美团研究院", "channel": "公众号 · 平台官方", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "36氪未来消费", "channel": "公众号 · 行业媒体", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "创新零售社", "channel": "公众号 · 行业媒体", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "晚点LatePost", "channel": "公众号 · 行业媒体", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "美团骑手", "channel": "公众号 · 骑手与即时配送", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "达达秒送骑士", "channel": "公众号 · 骑手与即时配送", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "亿邦动力", "channel": "网页/官网", "weight": 9, "basis": "域名命中加分", "detail": "ebrun.com · 电商、即时零售、商家生态"}, {"name": "IT之家", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "ithome.com · AI、入口产品、新功能发布"}, {"name": "TechWeb", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "techweb.com.cn · 互联网公司动态、产品发布"}, {"name": "UU跑腿官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "uupt.com · 跑腿服务、AI 下单、开放能力"}, {"name": "京东到家官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "jddj.com · 即时零售、商超便利、平台活动"}, {"name": "淘宝闪购商家培训", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "alins.ele.me · 淘宝闪购商家培训、经营规则"}, {"name": "美团商家外卖课堂", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "collegewm.meituan.com · 商家培训、经营工具、活动规则"}, {"name": "美团官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "meituan.com · 平台官方动态、本地生活、即时零售"}, {"name": "美团技术团队", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "tech.meituan.com · 美团技术、配送、AI Agent"}, {"name": "联商网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "linkshop.com · 零售业态、商超便利、门店供给"}, {"name": "虎嗅", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "huxiu.com · 行业评论、竞争格局、监管观察"}, {"name": "达达集团官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "imdada.cn · 即时配送、京东到家、商家履约"}, {"name": "闪送官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "ishansong.com · 一对一急送、产品功能、品牌动态"}, {"name": "顺丰同城官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "sf-cityrush.com · 同城急送、骑手权益、平台合作"}, {"name": "饿了么官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "ele.me · 本地生活、蜂鸟即配、平台活动"}, {"name": "21世纪经济报道", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "21jingji.com · 公司经营、产业政策、消费市场"}, {"name": "中国经济网", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "finance.ce.cn · 消费产业、平台活动、公司动态"}, {"name": "京报网", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "news.bjd.com.cn · 本地服务、AI 入口、平台合作"}, {"name": "亿欧", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "iyiou.com · 零售、电商、本地生活"}, {"name": "新浪财经", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "finance.sina.cn · 转载媒体、公司动态、行业快讯"}, {"name": "淘宝技术", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "tech.taobao.org · 阿里系技术、AI、履约能力"}, {"name": "界面新闻", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "jiemian.com · 消费、零售、公司新闻"}, {"name": "第一财经", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "yicai.com · 商业公司、消费零售、宏观行业"}, {"name": "网经社", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "100ec.cn · 电商、平台经济、监管动态"}, {"name": "钛媒体", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "tmtpost.com · 科技商业、平台战略"}, {"name": "京东外卖商家中心", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "京东秒送商家经营小助手", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "淘宝闪购商家课堂", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团下沉市场合作城市", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团商家中心", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团商户外卖通", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团外卖智能硬件", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团餐饮系统", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团餐饮经营宝", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团餐饮观察", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "京东外卖", "channel": "公众号 · 平台官方", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "京东研究院", "channel": "公众号 · 平台官方", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "淘宝闪购技术", "channel": "公众号 · 平台官方", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "淘宝闪购设计", "channel": "公众号 · 平台官方", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团 Meituan", "channel": "公众号 · 平台官方", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团外卖推广服务平台", "channel": "公众号 · 平台官方", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "36氪", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "36氪出海", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "DT商业观察", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "Tech星球", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "剑非观点", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "即时刘说", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "墨腾创投", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "张大爷聊外卖", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "投研小透明", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "海豚投研", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "海豚研究", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "第三只眼看零售", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "虎嗅", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "虎嗅APP", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "走马财经", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "起点财经", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "陈罡Pro", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "零售商业财经", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "雷峰网", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "雷锋网", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "淘宝闪购城市骑士", "channel": "公众号 · 骑手与即时配送", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团闪电仓", "channel": "公众号 · 骑手与即时配送", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "达达黑板报", "channel": "公众号 · 骑手与即时配送", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "DoNews", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "donews.com · 互联网、AI、平台动态"}, {"name": "上观新闻", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "shobserver.cn · 公司动态、上海本地服务、行业报道"}, {"name": "东方财富", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "finance.eastmoney.com · 上市公司、转载快讯、平台动态"}, {"name": "中国新闻网", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "chinanews.com.cn · 企业动态、地方消费、政策协同"}, {"name": "人民网", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "people.com.cn · 政策、监管、劳动权益"}, {"name": "同花顺财经", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "10jqka.com.cn · 转载快讯、上市公司、平台动态"}, {"name": "央视网", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "cctv.com · 监管、民生消费、行业报道"}, {"name": "新京报", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "bjnews.com.cn · 消费、即时零售、民生服务"}, {"name": "新华网", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "xinhuanet.com · 政策、民生、平台治理"}, {"name": "每日经济新闻", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "nbd.com.cn · 上市公司、消费产业、平台竞争"}, {"name": "澎湃新闻", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "thepaper.cn · 公司动态、社会治理、劳动权益"}, {"name": "观察者网", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "guancha.cn · 公司动态、平台经济、行业转载"}, {"name": "证券时报", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "stcn.com · 上市公司公告、资本市场动向"}, {"name": "财联社", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "cls.cn · 公司快讯、资本市场、行业事件"}, {"name": "雷峰网", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "leiphone.com · AI 技术、智能体、技术生态"}, {"name": "美团众包骑手APP 新功能", "channel": "平台/APP搜索", "weight": 5, "basis": "平台搜索词命中加分", "detail": "用于补充骑手 APP 等非网页渠道线索"}, {"name": "蜂鸟众包APP 新功能", "channel": "平台/APP搜索", "weight": 5, "basis": "平台搜索词命中加分", "detail": "用于补充骑手 APP 等非网页渠道线索"}, {"name": "公众号索引", "channel": "网页/官网", "weight": 5, "basis": "域名命中加分", "detail": "mp.weixin.qq.com · 平台官方、技术团队、行业自媒体"}, {"name": "大洋网", "channel": "网页/官网", "weight": 5, "basis": "域名命中加分", "detail": "dayoo.com · 地方消费、本地生活、民生服务"}, {"name": "Goldman Sachs", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "JP Morgan", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "中信证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "中金证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "交银国际", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "华泰证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "国信证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "国泰君安证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "国海证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "广发证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "招商海外", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "海通证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "今日头条", "channel": "网页/官网", "weight": 4, "basis": "域名命中加分", "detail": "toutiao.com · 转载新闻、行业自媒体"}, {"name": "搜狐", "channel": "网页/官网", "weight": 4, "basis": "域名命中加分", "detail": "sohu.com · 转载新闻、行业自媒体"}, {"name": "网易", "channel": "网页/官网", "weight": 4, "basis": "域名命中加分", "detail": "163.com · 转载新闻、行业自媒体"}, {"name": "Google Alert", "channel": "新闻搜索入口", "weight": 0, "basis": "搜索入口，不直接加分", "detail": "用于扩展抓取范围，候选分数仍由来源和正文命中决定"}, {"name": "新浪新闻", "channel": "新闻搜索入口", "weight": 0, "basis": "搜索入口，不直接加分", "detail": "用于扩展抓取范围，候选分数仍由来源和正文命中决定"}, {"name": "百度资讯", "channel": "新闻搜索入口", "weight": 0, "basis": "搜索入口，不直接加分", "detail": "用于扩展抓取范围，候选分数仍由来源和正文命中决定"}]};
+    const generatedMeta = {"updatedAt": "2026-07-15 15:31", "sourceCount": 114, "queryCount": 184, "candidateCount": 25, "newCandidateCount": 0, "retentionDays": 45, "status": "completed", "sourceWeights": [{"name": "36氪", "channel": "网页/官网", "weight": 10, "basis": "域名命中加分", "detail": "36kr.com · 即时零售、平台战略、融资快讯"}, {"name": "淘宝闪购商家中心", "channel": "公众号 · 商家端", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "美团外卖商家中心", "channel": "公众号 · 商家端", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "美团闪购商家中心", "channel": "公众号 · 商家端", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "京东秒送", "channel": "公众号 · 平台官方", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "京东黑板报", "channel": "公众号 · 平台官方", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "美团外卖", "channel": "公众号 · 平台官方", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "美团研究院", "channel": "公众号 · 平台官方", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "36氪未来消费", "channel": "公众号 · 行业媒体", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "创新零售社", "channel": "公众号 · 行业媒体", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "晚点LatePost", "channel": "公众号 · 行业媒体", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "美团骑手", "channel": "公众号 · 骑手与即时配送", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "达达秒送骑士", "channel": "公众号 · 骑手与即时配送", "weight": 9, "basis": "公众号名命中加分", "detail": "重点来源"}, {"name": "亿邦动力", "channel": "网页/官网", "weight": 9, "basis": "域名命中加分", "detail": "ebrun.com · 电商、即时零售、商家生态"}, {"name": "IT之家", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "ithome.com · AI、入口产品、新功能发布"}, {"name": "TechWeb", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "techweb.com.cn · 互联网公司动态、产品发布"}, {"name": "UU跑腿官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "uupt.com · 跑腿服务、AI 下单、开放能力"}, {"name": "京东到家官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "jddj.com · 即时零售、商超便利、平台活动"}, {"name": "淘宝闪购商家培训", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "alins.ele.me · 淘宝闪购商家培训、经营规则"}, {"name": "美团商家外卖课堂", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "collegewm.meituan.com · 商家培训、经营工具、活动规则"}, {"name": "美团官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "meituan.com · 平台官方动态、本地生活、即时零售"}, {"name": "美团技术团队", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "tech.meituan.com · 美团技术、配送、AI Agent"}, {"name": "联商网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "linkshop.com · 零售业态、商超便利、门店供给"}, {"name": "虎嗅", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "huxiu.com · 行业评论、竞争格局、监管观察"}, {"name": "达达集团官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "imdada.cn · 即时配送、京东到家、商家履约"}, {"name": "闪送官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "ishansong.com · 一对一急送、产品功能、品牌动态"}, {"name": "顺丰同城官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "sf-cityrush.com · 同城急送、骑手权益、平台合作"}, {"name": "饿了么官网", "channel": "网页/官网", "weight": 8, "basis": "域名命中加分", "detail": "ele.me · 本地生活、蜂鸟即配、平台活动"}, {"name": "21世纪经济报道", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "21jingji.com · 公司经营、产业政策、消费市场"}, {"name": "中国经济网", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "finance.ce.cn · 消费产业、平台活动、公司动态"}, {"name": "京报网", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "news.bjd.com.cn · 本地服务、AI 入口、平台合作"}, {"name": "亿欧", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "iyiou.com · 零售、电商、本地生活"}, {"name": "新浪财经", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "finance.sina.cn · 转载媒体、公司动态、行业快讯"}, {"name": "淘宝技术", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "tech.taobao.org · 阿里系技术、AI、履约能力"}, {"name": "界面新闻", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "jiemian.com · 消费、零售、公司新闻"}, {"name": "第一财经", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "yicai.com · 商业公司、消费零售、宏观行业"}, {"name": "网经社", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "100ec.cn · 电商、平台经济、监管动态"}, {"name": "钛媒体", "channel": "网页/官网", "weight": 7, "basis": "域名命中加分", "detail": "tmtpost.com · 科技商业、平台战略"}, {"name": "京东外卖商家中心", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "京东秒送商家经营小助手", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "淘宝闪购商家课堂", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团下沉市场合作城市", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团商家中心", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团商户外卖通", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团外卖智能硬件", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团餐饮系统", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团餐饮经营宝", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团餐饮观察", "channel": "公众号 · 商家端", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "京东外卖", "channel": "公众号 · 平台官方", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "京东研究院", "channel": "公众号 · 平台官方", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "淘宝闪购技术", "channel": "公众号 · 平台官方", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "淘宝闪购设计", "channel": "公众号 · 平台官方", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团 Meituan", "channel": "公众号 · 平台官方", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团外卖推广服务平台", "channel": "公众号 · 平台官方", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "36氪", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "36氪出海", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "DT商业观察", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "Tech星球", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "剑非观点", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "即时刘说", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "墨腾创投", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "张大爷聊外卖", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "投研小透明", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "海豚投研", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "海豚研究", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "第三只眼看零售", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "虎嗅", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "虎嗅APP", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "走马财经", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "起点财经", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "陈罡Pro", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "零售商业财经", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "雷峰网", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "雷锋网", "channel": "公众号 · 行业媒体", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "淘宝闪购城市骑士", "channel": "公众号 · 骑手与即时配送", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "美团闪电仓", "channel": "公众号 · 骑手与即时配送", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "达达黑板报", "channel": "公众号 · 骑手与即时配送", "weight": 6, "basis": "公众号名命中加分", "detail": "常规来源"}, {"name": "DoNews", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "donews.com · 互联网、AI、平台动态"}, {"name": "上观新闻", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "shobserver.cn · 公司动态、上海本地服务、行业报道"}, {"name": "东方财富", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "finance.eastmoney.com · 上市公司、转载快讯、平台动态"}, {"name": "中国新闻网", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "chinanews.com.cn · 企业动态、地方消费、政策协同"}, {"name": "人民网", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "people.com.cn · 政策、监管、劳动权益"}, {"name": "同花顺财经", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "10jqka.com.cn · 转载快讯、上市公司、平台动态"}, {"name": "央视网", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "cctv.com · 监管、民生消费、行业报道"}, {"name": "新京报", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "bjnews.com.cn · 消费、即时零售、民生服务"}, {"name": "新华网", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "xinhuanet.com · 政策、民生、平台治理"}, {"name": "每日经济新闻", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "nbd.com.cn · 上市公司、消费产业、平台竞争"}, {"name": "澎湃新闻", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "thepaper.cn · 公司动态、社会治理、劳动权益"}, {"name": "观察者网", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "guancha.cn · 公司动态、平台经济、行业转载"}, {"name": "证券时报", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "stcn.com · 上市公司公告、资本市场动向"}, {"name": "财联社", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "cls.cn · 公司快讯、资本市场、行业事件"}, {"name": "雷峰网", "channel": "网页/官网", "weight": 6, "basis": "域名命中加分", "detail": "leiphone.com · AI 技术、智能体、技术生态"}, {"name": "美团众包骑手APP 新功能", "channel": "平台/APP搜索", "weight": 5, "basis": "平台搜索词命中加分", "detail": "用于补充骑手 APP 等非网页渠道线索"}, {"name": "蜂鸟众包APP 新功能", "channel": "平台/APP搜索", "weight": 5, "basis": "平台搜索词命中加分", "detail": "用于补充骑手 APP 等非网页渠道线索"}, {"name": "公众号索引", "channel": "网页/官网", "weight": 5, "basis": "域名命中加分", "detail": "mp.weixin.qq.com · 平台官方、技术团队、行业自媒体"}, {"name": "大洋网", "channel": "网页/官网", "weight": 5, "basis": "域名命中加分", "detail": "dayoo.com · 地方消费、本地生活、民生服务"}, {"name": "Goldman Sachs", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "JP Morgan", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "中信证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "中金证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "交银国际", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "华泰证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "国信证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "国泰君安证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "国海证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "广发证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "招商海外", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "海通证券", "channel": "券商/研报", "weight": 4, "basis": "报告来源命中加分", "detail": "报告来源名称出现在标题或摘要时加分"}, {"name": "今日头条", "channel": "网页/官网", "weight": 4, "basis": "域名命中加分", "detail": "toutiao.com · 转载新闻、行业自媒体"}, {"name": "搜狐", "channel": "网页/官网", "weight": 4, "basis": "域名命中加分", "detail": "sohu.com · 转载新闻、行业自媒体"}, {"name": "网易", "channel": "网页/官网", "weight": 4, "basis": "域名命中加分", "detail": "163.com · 转载新闻、行业自媒体"}, {"name": "Google Alert", "channel": "新闻搜索入口", "weight": 0, "basis": "搜索入口，不直接加分", "detail": "用于扩展抓取范围，候选分数仍由来源和正文命中决定"}, {"name": "新浪新闻", "channel": "新闻搜索入口", "weight": 0, "basis": "搜索入口，不直接加分", "detail": "用于扩展抓取范围，候选分数仍由来源和正文命中决定"}, {"name": "百度资讯", "channel": "新闻搜索入口", "weight": 0, "basis": "搜索入口，不直接加分", "detail": "用于扩展抓取范围，候选分数仍由来源和正文命中决定"}]};
     // AUTO_CANDIDATES_END
     const storageKey = "quick-commerce-intel-custom-items";
     const ignoredCandidateKey = "quick-commerce-intel-ignored-candidates";
@@ -1449,7 +1382,7 @@
       return [...baseIntel, ...getCustom()]
         .filter(item => !removed.has(item.id))
         .map(applyItemEdits)
-        .sort((a, b) => b.date.localeCompare(a.date));
+        .sort((a, b) => publicationDate(b).localeCompare(publicationDate(a)));
     };
     function recoverSfAlipayIntelOnce() {
       if (localStorage.getItem(sfAlipayRecoveryKey)) return;
@@ -1465,7 +1398,13 @@
       localStorage.setItem(sfAlipayRecoveryKey, "done");
     }
     recoverSfAlipayIntelOnce();
-    const itemMonth = item => (item.date || "").slice(0, 7);
+    const publicationDate = item => item.publishedDate || item.date || "";
+    const collectionDate = item => item.collectedAt || "";
+    const cleanSummary = value => String(value || "")
+      .replace(/^\s*(?:刚刚|\d+\s*(?:秒|分钟|小时|天|周)前)\s*[-—|:：]?\s*/i, "")
+      .replace(/^\s*20\d{2}(?:年\d{1,2}月\d{1,2}日?|[-/]\d{1,2}[-/]\d{1,2})\s*[-—|:：]?\s*/, "")
+      .trim();
+    const itemMonth = item => publicationDate(item).slice(0, 7);
     const escapeHtml = value => String(value || "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
     const cleanBusinessText = text => String(text || "").replaceAll(placeholderSummary, "");
     const currentMonth = () => selectedMonthFrom(els.month);
@@ -1775,7 +1714,10 @@
         });
         existing.sourceCount = itemSources(existing).length;
         existing.score = Math.min(99, Math.max(existing.score || 0, item.score || 0) + Math.min(8, existing.sourceCount - 1));
-        if ((item.date || "") > (existing.date || "")) existing.date = item.date;
+        if (publicationDate(item) > publicationDate(existing)) {
+          existing.date = publicationDate(item);
+          existing.publishedDate = publicationDate(item);
+        }
         if ((item.summary || "").length > (existing.summary || "").length) existing.summary = item.summary;
         existing.sourceName = itemSources(existing).slice(0, 3).map(source => source.name).join(" / ");
         existing.sourceUrl = itemSources(existing)[0]?.url || existing.sourceUrl;
@@ -2374,7 +2316,7 @@
     function renderCandidates() {
       const list = document.getElementById("candidate-list");
       const updated = document.getElementById("candidate-updated");
-      updated.textContent = generatedMeta.updatedAt || "待运行";
+      updated.textContent = generatedMeta.updatedAt ? "最近抓取：" + generatedMeta.updatedAt : "最近抓取：待运行";
       const candidates = currentCandidates();
       renderMetrics(candidates);
       renderCrawlStatus(candidates);
@@ -2391,13 +2333,14 @@
         <article class="candidate-card">
           <div class="candidate-top">
             <div>
-              <p class="platform">${escapeHtml(item.platform || "待识别平台")} · ${escapeHtml(item.date || "日期待识别")}</p>
+              <p class="platform">${escapeHtml(item.platform || "待识别平台")} · ${escapeHtml(publicationDate(item) || "日期待识别")}</p>
               <h3>${escapeHtml(item.title)}</h3>
             </div>
           </div>
-          <p class="summary">${escapeHtml(item.summary)}</p>
+          <p class="summary">${escapeHtml(cleanSummary(item.summary))}</p>
           <div class="tags">${businessPill(item)}<span>${escapeHtml(item.category || "候选")}</span><span>${escapeHtml(sourceLabel(item))}</span>${isWechatCandidate(item) ? `<span>公众号线索</span><span>${escapeHtml(wechatStatusLabel(item))}</span>` : ""}</div>
           ${candidateFullTextPanel(item)}
+          <p class="collection-note">${collectionDate(item) ? "抓取于 " + escapeHtml(collectionDate(item)) : ""}</p>
           <div class="source-row">
             ${sourceLinks(item)}
             <div class="candidate-actions">
@@ -2416,7 +2359,9 @@
           const relevance = buyerRelevanceOf(item);
           const saved = {
             id: `custom-${item.id}`,
-            date: item.date || "2026-07-08",
+            date: publicationDate(item) || "2026-07-08",
+            publishedDate: publicationDate(item) || "2026-07-08",
+            collectedAt: collectionDate(item),
             platform: item.platform || "待识别平台",
             title: item.title,
             type: item.type || "自动候选",
@@ -2538,7 +2483,7 @@
       els.list.innerHTML = filtered.map(item => `
         <article class="card ${selectedMergeIds.has(item.id) ? "is-merge-selected" : ""}">
           <div class="date">
-            <span>${item.date.slice(5)}</span>
+            <span>${publicationDate(item).slice(5)}</span>
             <strong>${item.priority}</strong>
             <label class="merge-choice"><input data-merge-select="${escapeHtml(item.id)}" type="checkbox" ${selectedMergeIds.has(item.id) ? "checked" : ""} /><span>合并</span></label>
           </div>
@@ -2551,7 +2496,7 @@
             </div>
             <div class="tags">${businessPill(item)}<span>${item.category}</span><span>${item.type}</span></div>
             ${itemEditPanel(item)}
-            <p class="summary">${escapeHtml(item.summary)}</p>
+            <p class="summary">${escapeHtml(cleanSummary(item.summary))}</p>
             <p class="judge">${escapeHtml(item.judge)}</p>
             <div class="source-row">
               ${sourceLinks(item)}
@@ -2621,6 +2566,8 @@
       const item = {
         id: `custom-${Date.now()}`,
         date: document.getElementById("date").value || "2026-07-08",
+        publishedDate: document.getElementById("date").value || "2026-07-08",
+        collectedAt: localDateISO(),
         platform: document.getElementById("new-platform").value.trim(),
         title: document.getElementById("title").value.trim(),
         type: "手动录入",

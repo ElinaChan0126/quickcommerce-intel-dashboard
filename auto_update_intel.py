@@ -849,9 +849,13 @@ def make_candidate(title: str, description: str, link: str, pub_date: str = "") 
     sources = [source_object(link, text)]
     relevance_score, relevance_reason = buyer_relevance(text)
     is_wechat = "mp.weixin.qq.com" in link
+    published_date = parse_date(pub_date, title)
+    collected_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
     return {
         "id": candidate_id(link, title),
-        "date": parse_date(pub_date, title),
+        "date": published_date,
+        "publishedDate": published_date,
+        "collectedAt": collected_at,
         "platform": platform_from_text(text),
         "title": title,
         "type": "自动候选",
@@ -923,10 +927,12 @@ def enrich_wechat_candidate(candidate: dict) -> dict:
         candidate["needsFullText"] = True
         return candidate
     text = f"{meta['account']} {meta['title']} {meta['summary']} {meta.get('content', '')}"
+    published_date = meta["date"] or candidate.get("publishedDate") or candidate.get("date", "")
     candidate.update({
         "title": meta["title"],
         "summary": meta["summary"][:220],
-        "date": meta["date"] or candidate.get("date"),
+        "date": published_date,
+        "publishedDate": published_date,
         "platform": platform_from_text(text),
         "category": category_from_text(text),
         "businessTag": business_tag_from_text(text),
@@ -962,8 +968,9 @@ def merge_candidates(candidates: list[dict]) -> list[dict]:
         existing["sources"] = existing_sources
         existing["sourceCount"] = len(existing_sources)
         existing["score"] = min(99, max(existing.get("score", 0), candidate.get("score", 0)) + min(8, len(existing_sources) - 1))
-        if candidate.get("date", "") > existing.get("date", ""):
-            existing["date"] = candidate["date"]
+        if (candidate.get("publishedDate") or candidate.get("date", "")) > (existing.get("publishedDate") or existing.get("date", "")):
+            existing["date"] = candidate.get("publishedDate") or candidate.get("date", "")
+            existing["publishedDate"] = existing["date"]
         if len(candidate.get("summary", "")) > len(existing.get("summary", "")):
             existing["summary"] = candidate["summary"]
         existing["sourceName"] = " / ".join(source.get("name", "来源") for source in existing_sources[:3])
@@ -1045,6 +1052,7 @@ def collect_candidates() -> list[dict]:
                 actual_date = source_date(candidate["sourceUrl"])
                 if actual_date:
                     candidate["date"] = actual_date
+                    candidate["publishedDate"] = actual_date
                     candidate_date = datetime.fromisoformat(actual_date).date()
                 else:
                     # 网页来源没有可验证的发布时间时，不使用搜索摘要日期兜底。
@@ -1090,6 +1098,11 @@ KNOWN_SOURCE_DATES = {
     # 36氪这篇原文明确发表于 2023-07-12；旧版本曾把搜索摘要日期写成 2026-07-06。
     "https://36kr.com/p/2340566436267400": "2023-07-12",
     "https://www.36kr.com/p/2340566436267400": "2023-07-12",
+    "https://www.36kr.com/p/3390935788362118": "2025-07-23",
+    "https://36kr.com/p/3390935788362118": "2025-07-23",
+    "https://m.36kr.com/p/2847873195334533": "2024-07-05",
+    "https://www.36kr.com/p/2847873195334533": "2024-07-05",
+    "https://36kr.com/p/2847873195334533": "2024-07-05",
 }
 
 
@@ -1100,6 +1113,7 @@ def refresh_existing_candidate_dates(candidates: list[dict]) -> list[dict]:
         url = candidate.get("sourceUrl", "")
         if url in KNOWN_SOURCE_DATES:
             candidate["date"] = KNOWN_SOURCE_DATES[url]
+            candidate["publishedDate"] = KNOWN_SOURCE_DATES[url]
             continue
         if "mp.weixin.qq.com" in url:
             continue
@@ -1108,6 +1122,10 @@ def refresh_existing_candidate_dates(candidates: list[dict]) -> list[dict]:
         actual_date = source_date(url)
         if actual_date:
             candidate["date"] = actual_date
+            candidate["publishedDate"] = actual_date
+        else:
+            # 来源暂时不可访问时，保留已有记录，避免一次网络异常清空候选池。
+            candidate.setdefault("publishedDate", candidate.get("date", ""))
     return candidates
 
 
@@ -1124,7 +1142,10 @@ def recent_candidates(candidates: list[dict]) -> list[dict]:
         ):
             continue
         try:
-            candidate_date = datetime.fromisoformat(candidate.get("date", "")).date()
+            published_date = candidate.get("publishedDate") or candidate.get("date", "")
+            candidate_date = datetime.fromisoformat(published_date).date()
+            candidate["publishedDate"] = published_date
+            candidate["date"] = published_date
         except (TypeError, ValueError):
             continue
         if candidate_date >= cutoff and candidate_date <= today:
@@ -1132,11 +1153,23 @@ def recent_candidates(candidates: list[dict]) -> list[dict]:
     return kept
 
 
+def normalize_published_fields(candidates: list[dict], collected_at: str) -> list[dict]:
+    for candidate in candidates:
+        published_date = candidate.get("publishedDate") or candidate.get("date", "")
+        candidate["publishedDate"] = published_date
+        candidate["date"] = published_date
+        if candidate.get("type") == "自动候选":
+            candidate.setdefault("collectedAt", collected_at)
+    return candidates
+
+
 def inject_candidates(dashboard: Path, candidates: list[dict]) -> None:
     text = dashboard.read_text(encoding="utf-8")
+    collected_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
     existing = refresh_existing_candidate_dates(read_existing_generated_candidates(dashboard))
-    merged = recent_candidates(merge_candidates(existing + candidates))
-    updated_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
+    normalized = normalize_published_fields(existing + candidates, collected_at)
+    merged = recent_candidates(merge_candidates(normalized))
+    updated_at = collected_at
     meta = {
         "updatedAt": updated_at,
         "sourceCount": source_inventory_count(),
