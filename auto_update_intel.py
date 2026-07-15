@@ -1015,6 +1015,15 @@ def parse_so_results(html_text: str) -> list[dict]:
     return candidates
 
 
+def leading_search_date(text: str) -> str | None:
+    # 仅用于 36氪新闻快讯：摘要开头通常就是快讯发布日期。
+    match = re.match(
+        r"\s*(20\d{2}(?:年\d{1,2}月\d{1,2}日?|[-/]\d{1,2}[-/]\d{1,2}))",
+        text or "",
+    )
+    return parse_absolute_date(match.group(1)) if match else None
+
+
 def collect_candidates() -> list[dict]:
     seen = set()
     collected = []
@@ -1055,8 +1064,19 @@ def collect_candidates() -> list[dict]:
                     candidate["publishedDate"] = actual_date
                     candidate_date = datetime.fromisoformat(actual_date).date()
                 else:
-                    # 网页来源没有可验证的发布时间时，不使用搜索摘要日期兜底。
-                    candidate_date = None
+                    url = candidate.get("sourceUrl", "")
+                    fallback_date = (
+                        leading_search_date(candidate.get("summary", ""))
+                        if "36kr.com/newsflashes/" in url
+                        else None
+                    )
+                    if fallback_date:
+                        candidate["date"] = fallback_date
+                        candidate["publishedDate"] = fallback_date
+                        candidate_date = datetime.fromisoformat(fallback_date).date()
+                    else:
+                        # 普通文章不信任搜索摘要日期；没有来源页日期就不入新池。
+                        candidate_date = None
             if candidate_date is None:
                 # 没有文章页或搜索结果提供可验证日期时，宁可不入池。
                 continue
@@ -1095,7 +1115,7 @@ def read_existing_generated_candidates(dashboard: Path) -> list[dict]:
 
 
 KNOWN_SOURCE_DATES = {
-    # 36氪这篇原文明确发表于 2023-07-12；旧版本曾把搜索摘要日期写成 2026-07-06。
+    # 已核对的 36氪原文日期，修正旧版本把搜索/抓取日期当成发布日期的问题。
     "https://36kr.com/p/2340566436267400": "2023-07-12",
     "https://www.36kr.com/p/2340566436267400": "2023-07-12",
     "https://www.36kr.com/p/3390935788362118": "2025-07-23",
@@ -1103,6 +1123,7 @@ KNOWN_SOURCE_DATES = {
     "https://m.36kr.com/p/2847873195334533": "2024-07-05",
     "https://www.36kr.com/p/2847873195334533": "2024-07-05",
     "https://36kr.com/p/2847873195334533": "2024-07-05",
+    "https://36kr.com/newsflashes/3758988609438210": "2026-04-09",
 }
 
 
@@ -1120,12 +1141,18 @@ def refresh_existing_candidate_dates(candidates: list[dict]) -> list[dict]:
         if candidate.get("score", 0) < 70 or not url:
             continue
         actual_date = source_date(url)
+        if not actual_date and "36kr.com/newsflashes/" in url:
+            actual_date = leading_search_date(candidate.get("summary", ""))
         if actual_date:
             candidate["date"] = actual_date
             candidate["publishedDate"] = actual_date
-        else:
-            # 来源暂时不可访问时，保留已有记录，避免一次网络异常清空候选池。
-            candidate.setdefault("publishedDate", candidate.get("date", ""))
+            continue
+        collected_at = str(candidate.get("collectedAt", ""))[:10]
+        old_date = candidate.get("publishedDate") or candidate.get("date", "")
+        if collected_at and old_date == collected_at:
+            # 旧版本把抓取日写成发布日期，无法验证时直接移除这个错误日期。
+            candidate["date"] = ""
+            candidate["publishedDate"] = ""
     return candidates
 
 
