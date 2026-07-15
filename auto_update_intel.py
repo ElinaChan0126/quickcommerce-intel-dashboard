@@ -743,7 +743,9 @@ def parse_date(pub_date: str, text: str) -> str:
                 pass
         if parsed:
             return parsed.astimezone(CN_TZ).date().isoformat()
-    return datetime.now(CN_TZ).date().isoformat()
+    # 不要把“没有识别到日期”伪装成今天，否则搜索摘要中的旧内容会
+    # 被错误地当作当天线索进入候选池。
+    return ""
 
 
 def source_date(url: str) -> str | None:
@@ -1020,16 +1022,22 @@ def collect_candidates() -> list[dict]:
                 candidate["sources"] = [source_object(resolved_url, f"{candidate.get('title', '')} {candidate.get('summary', '')}")]
             if "mp.weixin.qq.com" in candidate.get("sourceUrl", "") and candidate.get("score", 0) >= 60:
                 candidate = enrich_wechat_candidate(candidate)
-            today = datetime.now(CN_TZ).date().isoformat()
-            if candidate["date"] == today and candidate["score"] >= 80:
+            today = datetime.now(CN_TZ).date()
+            candidate_date = None
+            try:
+                if candidate.get("date"):
+                    candidate_date = datetime.fromisoformat(candidate["date"]).date()
+            except ValueError:
+                candidate_date = None
+            if (candidate_date is None or candidate_date == today) and candidate["score"] >= 80:
                 actual_date = source_date(candidate["sourceUrl"])
                 if actual_date:
                     candidate["date"] = actual_date
-            try:
-                candidate_date = datetime.fromisoformat(candidate["date"]).date()
-            except ValueError:
-                candidate_date = datetime.now(CN_TZ).date()
-            if candidate_date < cutoff:
+                    candidate_date = datetime.fromisoformat(actual_date).date()
+            if candidate_date is None:
+                # 没有文章页或搜索结果提供可验证日期时，宁可不入池。
+                continue
+            if candidate_date < cutoff or candidate_date > today:
                 continue
             if any(part in candidate["sourceUrl"] for part in EXCLUDED_URL_PARTS):
                 continue
@@ -1065,13 +1073,21 @@ def read_existing_generated_candidates(dashboard: Path) -> list[dict]:
 
 def recent_candidates(candidates: list[dict]) -> list[dict]:
     cutoff = (datetime.now(CN_TZ) - timedelta(days=RECENT_DAYS)).date()
+    today = datetime.now(CN_TZ).date()
     kept = []
     for candidate in candidates:
+        # 清理旧版本把“无日期”错误写成今天的自动候选。
+        if (
+            candidate.get("type") == "自动候选"
+            and candidate.get("date") == today.isoformat()
+            and candidate.get("summary") == "搜索结果未提供摘要，请打开来源复核。"
+        ):
+            continue
         try:
             candidate_date = datetime.fromisoformat(candidate.get("date", "")).date()
         except (TypeError, ValueError):
-            candidate_date = datetime.now(CN_TZ).date()
-        if candidate_date >= cutoff:
+            continue
+        if candidate_date >= cutoff and candidate_date <= today:
             kept.append(candidate)
     return kept
 
