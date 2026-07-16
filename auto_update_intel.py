@@ -185,15 +185,35 @@ ALL_WEB_SOURCES = DATA_SOURCES + MERCHANT_WEB_SOURCES
 HIGH_SIGNAL_SOURCES = [source for source in ALL_WEB_SOURCES if source["weight"] >= 8]
 SOURCE_LOOKUP = {source["domain"]: source for source in ALL_WEB_SOURCES}
 
-def month_labels() -> list[str]:
+def period_labels(target_month: str | None = None) -> list[str]:
+    if target_month:
+        try:
+            parsed = datetime.strptime(target_month, "%Y-%m")
+        except ValueError as exc:
+            raise ValueError("--month must use YYYY-MM format") from exc
+        return [f"{parsed.year}年{parsed.month}月"]
     today = datetime.now(CN_TZ)
-    current = f"{today.year}年{today.month}月"
-    previous_date = (today.replace(day=1) - timedelta(days=1))
-    previous = f"{previous_date.year}年{previous_date.month}月"
-    return [current, previous]
+    return [f"{today.year}年{today.month}月{today.day}日"]
 
 
-def build_queries() -> list[str]:
+def target_date_window(target_month: str | None = None) -> tuple[object, object]:
+    today = datetime.now(CN_TZ).date()
+    if not target_month:
+        return today, today
+    try:
+        parsed = datetime.strptime(target_month, "%Y-%m").date()
+    except ValueError as exc:
+        raise ValueError("--month must use YYYY-MM format") from exc
+    start = parsed.replace(day=1)
+    if parsed.month == 12:
+        next_month = parsed.replace(year=parsed.year + 1, month=1, day=1)
+    else:
+        next_month = parsed.replace(month=parsed.month + 1, day=1)
+    end = min(next_month - timedelta(days=1), today)
+    return start, end
+
+
+def build_queries(target_month: str | None = None) -> list[str]:
     queries: list[str] = []
     broad_terms = [
         "即时配送 上线 新功能 AI 下单",
@@ -240,9 +260,9 @@ def build_queries() -> list[str]:
         f"{channel} 即时零售 闪购 跑腿 秒送"
         for channel in NEWS_SEARCH_CHANNELS
     ]
-    for month in month_labels():
+    for period in period_labels(target_month):
         for term in broad_terms + platform_terms + source_queries + account_queries + wechat_article_queries + platform_queries + report_queries + news_queries:
-            queries.append(f"{month} {term}")
+            queries.append(f"{period} {term}")
     return queries
 
 
@@ -1040,11 +1060,11 @@ def leading_search_date(text: str) -> str | None:
     return parse_absolute_date(match.group(1)) if match else None
 
 
-def collect_candidates() -> list[dict]:
+def collect_candidates(target_month: str | None = None) -> list[dict]:
     seen = set()
     collected = []
-    cutoff = (datetime.now(CN_TZ) - timedelta(days=RECENT_DAYS)).date()
-    for query in build_queries():
+    window_start, window_end = target_date_window(target_month)
+    for query in build_queries(target_month):
         candidates = []
         urls = [
             ("bing", "https://www.bing.com/search?format=rss&q=" + quote(query)),
@@ -1097,7 +1117,7 @@ def collect_candidates() -> list[dict]:
             if candidate_date is None:
                 # 没有文章页或搜索结果提供可验证日期时，宁可不入池。
                 continue
-            if candidate_date < cutoff or candidate_date > today:
+            if candidate_date < window_start or candidate_date > window_end:
                 continue
             if any(part in candidate["sourceUrl"] for part in EXCLUDED_URL_PARTS):
                 continue
@@ -1219,7 +1239,7 @@ def normalize_published_fields(candidates: list[dict], collected_at: str) -> lis
     return candidates
 
 
-def inject_candidates(dashboard: Path, candidates: list[dict]) -> None:
+def inject_candidates(dashboard: Path, candidates: list[dict], target_month: str | None = None) -> None:
     text = dashboard.read_text(encoding="utf-8")
     collected_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
     existing = refresh_existing_candidate_dates(read_existing_generated_candidates(dashboard))
@@ -1229,7 +1249,7 @@ def inject_candidates(dashboard: Path, candidates: list[dict]) -> None:
     meta = {
         "updatedAt": updated_at,
         "sourceCount": source_inventory_count(),
-        "queryCount": len(build_queries()),
+        "queryCount": len(build_queries(target_month)),
         "candidateCount": len(merged),
         "newCandidateCount": len(candidates),
         "retentionDays": RECENT_DAYS,
@@ -1259,15 +1279,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Update quick-commerce intel candidates.")
     parser.add_argument("--dashboard", type=Path, default=DASHBOARD, help="Dashboard HTML path.")
     parser.add_argument("--dry-run", action="store_true", help="Print candidates without editing HTML.")
+    parser.add_argument("--month", help="Backfill a whole month in YYYY-MM format; default is today only.")
     args = parser.parse_args()
 
-    candidates = collect_candidates()
+    candidates = collect_candidates(args.month)
     if args.dry_run:
         print(json.dumps(candidates, ensure_ascii=False, indent=2))
         return
     if not candidates and has_existing_generated_candidates(args.dashboard):
         raise RuntimeError("本次未获取到候选，保留现有候选池；请检查网络或搜索源后重试。")
-    inject_candidates(args.dashboard, candidates)
+    inject_candidates(args.dashboard, candidates, args.month)
     retained = len(read_existing_generated_candidates(args.dashboard))
     print(f"updated {args.dashboard} with {len(candidates)} new candidates; {retained} retained candidates")
 
