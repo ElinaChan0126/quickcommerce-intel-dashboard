@@ -983,7 +983,8 @@ def merge_candidates(candidates: list[dict]) -> list[dict]:
             merged_date = min(existing_date, candidate_date)
         else:
             merged_date = existing_date or candidate_date
-        if merged_date and merged_date != existing_date:
+        current_date = existing.get("publishedDate") or existing.get("date", "")
+        if merged_date and merged_date != current_date:
             existing["date"] = merged_date
             existing["publishedDate"] = merged_date
         if len(candidate.get("summary", "")) > len(existing.get("summary", "")):
