@@ -428,6 +428,18 @@ EXCLUDED_URL_PARTS = [
     "hunantoday.cn",
 ]
 
+RELATIVE_DATE_PATTERN = re.compile(
+    r"(?:刚刚|昨天|前天|\d+\s*(?:秒|分钟|小时|天|周|月|年)\s*前)"
+)
+
+
+def is_unreliable_current_date(candidate: dict, published_date: str | None) -> bool:
+    """Reject search/index timestamps presented as today's publication date."""
+    if not published_date or published_date != datetime.now(CN_TZ).date().isoformat():
+        return False
+    text = f"{candidate.get('title', '')} {candidate.get('summary', '')}"
+    return bool(RELATIVE_DATE_PATTERN.search(text))
+
 CATEGORY_RULES = [
     ("AI入口", ["AI", "人工智能", "智能", "对话", "助手"]),
     ("营销活动", ["活动", "节", "套餐", "补贴", "世界杯", "618", "大促"]),
@@ -1096,7 +1108,7 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
             if "mp.weixin.qq.com" not in candidate.get("sourceUrl", "") and candidate["score"] >= 70:
                 url = candidate.get("sourceUrl", "")
                 actual_date = KNOWN_SOURCE_DATES.get(url) or source_date(url)
-                if actual_date:
+                if actual_date and not is_unreliable_current_date(candidate, actual_date):
                     candidate["date"] = actual_date
                     candidate["publishedDate"] = actual_date
                     candidate_date = datetime.fromisoformat(actual_date).date()
@@ -1107,7 +1119,7 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
                         if "36kr.com/newsflashes/" in url
                         else None
                     )
-                    if fallback_date:
+                    if fallback_date and not is_unreliable_current_date(candidate, fallback_date):
                         candidate["date"] = fallback_date
                         candidate["publishedDate"] = fallback_date
                         candidate_date = datetime.fromisoformat(fallback_date).date()
@@ -1172,6 +1184,7 @@ KNOWN_SOURCE_DATES = {
     "https://www.36kr.com/p/2847873195334533": "2024-07-05",
     "https://36kr.com/p/2847873195334533": "2024-07-05",
     "https://36kr.com/newsflashes/3758988609438210": "2026-04-09",
+    "https://www.36kr.com/p/3433394021977729": "2025-08-22",
 }
 
 
@@ -1191,9 +1204,13 @@ def refresh_existing_candidate_dates(candidates: list[dict]) -> list[dict]:
         actual_date = source_date(url)
         if not actual_date and "36kr.com/newsflashes/" in url:
             actual_date = leading_search_date(candidate.get("summary", ""))
-        if actual_date:
+        if actual_date and not is_unreliable_current_date(candidate, actual_date):
             candidate["date"] = actual_date
             candidate["publishedDate"] = actual_date
+            continue
+        if is_unreliable_current_date(candidate, actual_date):
+            candidate["date"] = ""
+            candidate["publishedDate"] = ""
             continue
         collected_at = str(candidate.get("collectedAt", ""))[:10]
         old_date = candidate.get("publishedDate") or candidate.get("date", "")
