@@ -968,9 +968,24 @@ def merge_candidates(candidates: list[dict]) -> list[dict]:
         existing["sources"] = existing_sources
         existing["sourceCount"] = len(existing_sources)
         existing["score"] = min(99, max(existing.get("score", 0), candidate.get("score", 0)) + min(8, len(existing_sources) - 1))
-        if (candidate.get("publishedDate") or candidate.get("date", "")) > (existing.get("publishedDate") or existing.get("date", "")):
-            existing["date"] = candidate.get("publishedDate") or candidate.get("date", "")
-            existing["publishedDate"] = existing["date"]
+        candidate_url = candidate.get("sourceUrl", "")
+        existing_url = existing.get("sourceUrl", "")
+        candidate_date = KNOWN_SOURCE_DATES.get(candidate_url) or candidate.get("publishedDate") or candidate.get("date", "")
+        existing_date = KNOWN_SOURCE_DATES.get(existing_url) or existing.get("publishedDate") or existing.get("date", "")
+        candidate_is_known = candidate_url in KNOWN_SOURCE_DATES
+        existing_is_known = existing_url in KNOWN_SOURCE_DATES
+        if existing_is_known:
+            merged_date = KNOWN_SOURCE_DATES[existing_url]
+        elif candidate_is_known:
+            merged_date = KNOWN_SOURCE_DATES[candidate_url]
+        elif existing_date and candidate_date:
+            # 同一事件多次出现时保留最早的可验证发布日期，不能用采集日覆盖旧日期。
+            merged_date = min(existing_date, candidate_date)
+        else:
+            merged_date = existing_date or candidate_date
+        if merged_date and merged_date != existing_date:
+            existing["date"] = merged_date
+            existing["publishedDate"] = merged_date
         if len(candidate.get("summary", "")) > len(existing.get("summary", "")):
             existing["summary"] = candidate["summary"]
         existing["sourceName"] = " / ".join(source.get("name", "来源") for source in existing_sources[:3])
@@ -1058,7 +1073,8 @@ def collect_candidates() -> list[dict]:
             except ValueError:
                 candidate_date = None
             if "mp.weixin.qq.com" not in candidate.get("sourceUrl", "") and candidate["score"] >= 70:
-                actual_date = source_date(candidate["sourceUrl"])
+                url = candidate.get("sourceUrl", "")
+                actual_date = KNOWN_SOURCE_DATES.get(url) or source_date(url)
                 if actual_date:
                     candidate["date"] = actual_date
                     candidate["publishedDate"] = actual_date
@@ -1193,7 +1209,8 @@ def recent_candidates(candidates: list[dict]) -> list[dict]:
 
 def normalize_published_fields(candidates: list[dict], collected_at: str) -> list[dict]:
     for candidate in candidates:
-        published_date = candidate.get("publishedDate") or candidate.get("date", "")
+        known_date = KNOWN_SOURCE_DATES.get(candidate.get("sourceUrl", ""))
+        published_date = known_date or candidate.get("publishedDate") or candidate.get("date", "")
         candidate["publishedDate"] = published_date
         candidate["date"] = published_date
         if candidate.get("type") == "自动候选":
