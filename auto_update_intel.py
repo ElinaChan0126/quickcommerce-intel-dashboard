@@ -796,9 +796,8 @@ def source_date(url: str) -> str | None:
         if parsed:
             return parsed
 
-    ct_match = re.search(r"""\bct\s*=\s*["']?(\d{9,})""", body)
-    if ct_match:
-        return parse_html_date(ct_match.group(1))
+    # ct is a WeChat-specific timestamp and is not reliable on generic web pages.
+    # WeChat candidates use their own article parser, so do not use it here.
     return None
 
 
@@ -1107,7 +1106,12 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
                 candidate_date = None
             if "mp.weixin.qq.com" not in candidate.get("sourceUrl", "") and candidate["score"] >= 70:
                 url = candidate.get("sourceUrl", "")
-                actual_date = KNOWN_SOURCE_DATES.get(url) or source_date(url)
+                summary_date = leading_search_date(candidate.get("summary", ""))
+                if "36kr.com/newsflashes/" in url:
+                    # 36氪快讯摘要开头的日期是快讯发布日期，优先于页面索引时间。
+                    actual_date = KNOWN_SOURCE_DATES.get(url) or summary_date or source_date(url)
+                else:
+                    actual_date = KNOWN_SOURCE_DATES.get(url) or source_date(url)
                 if actual_date and not is_unreliable_current_date(candidate, actual_date):
                     candidate["date"] = actual_date
                     candidate["publishedDate"] = actual_date
@@ -1201,9 +1205,12 @@ def refresh_existing_candidate_dates(candidates: list[dict]) -> list[dict]:
             continue
         if candidate.get("score", 0) < 70 or not url:
             continue
-        actual_date = source_date(url)
-        if not actual_date and "36kr.com/newsflashes/" in url:
-            actual_date = leading_search_date(candidate.get("summary", ""))
+        summary_date = leading_search_date(candidate.get("summary", ""))
+        if "36kr.com/newsflashes/" in url:
+            # 36氪快讯摘要开头的日期是快讯发布日期，优先于页面索引时间。
+            actual_date = summary_date or source_date(url)
+        else:
+            actual_date = source_date(url)
         if actual_date and not is_unreliable_current_date(candidate, actual_date):
             candidate["date"] = actual_date
             candidate["publishedDate"] = actual_date
