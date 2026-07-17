@@ -7,6 +7,15 @@ const crypto = require("crypto");
 const { spawn, spawnSync } = require("child_process");
 
 const DEFAULT_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const REPO_ROOT = path.resolve(__dirname, "..");
+
+function loadPlaywright() {
+  try {
+    return require("playwright");
+  } catch {
+    return require(path.join(REPO_ROOT, "tools", "playwright-runtime", "node_modules", "playwright"));
+  }
+}
 
 function argValue(name, fallback = "") {
   const index = process.argv.indexOf(name);
@@ -148,6 +157,54 @@ function isDirectWechatUrl(url) {
 
 function isWechatSourceUrl(url) {
   return isDirectWechatUrl(url);
+}
+
+async function scrapeArticleWithPlaywright(url, chromePath) {
+  const { chromium } = loadPlaywright();
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath: chromePath,
+    args: ["--disable-background-networking", "--disable-breakpad", "--disable-sync"],
+  });
+  try {
+    const page = await browser.newPage({
+      viewport: { width: 1280, height: 1600 },
+      userAgent: "Mozilla/5.0 competitor-intel-bot/0.1",
+    });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.waitForTimeout(6500);
+    await page.locator("#js_content").waitFor({ state: "attached", timeout: 15000 }).catch(() => {});
+    const article = await page.evaluate(() => {
+      const text = selector => document.querySelector(selector)?.textContent?.trim().replace(/\s+/g, " ") || "";
+      const attr = (selector, name) => document.querySelector(selector)?.getAttribute(name) || "";
+      const content = document.querySelector("#js_content");
+      const links = [...(content?.querySelectorAll("a[href]") || [])]
+        .map(a => ({ text: a.textContent.trim(), href: a.href }))
+        .filter(x => x.href);
+      const images = [...(content?.querySelectorAll("img") || [])]
+        .map(img => img.dataset.src || img.src)
+        .filter(Boolean);
+      return {
+        url: location.href,
+        title: text("#activity-name") || document.title,
+        account: text("#js_name"),
+        author: text("#js_author_name"),
+        publishTime: text("#publish_time"),
+        digest: attr('meta[property="og:description"]', "content") || attr('meta[name="description"]', "content"),
+        text: content?.innerText?.trim() || "",
+        html: content?.innerHTML || "",
+        images,
+        links,
+        blockedText: document.body.innerText.slice(0, 300),
+      };
+    });
+    const ok = article.title && article.text && article.text.length > 30 && !/环境异常|访问过于频繁|请在微信客户端打开|验证码/.test(article.blockedText || "");
+    article.ok = Boolean(ok);
+    article.fetchedAt = new Date().toISOString();
+    return article;
+  } finally {
+    await browser.close();
+  }
 }
 
 function platformFromText(text) {
@@ -457,7 +514,6 @@ async function main() {
   const outDir = argValue("--out", "wechat-articles");
   const dashboardPath = path.resolve(argValue("--dashboard", "index.html"));
   const chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || argValue("--chrome", DEFAULT_CHROME);
-  const port = Number(argValue("--port", "9227"));
   const shouldSaveFiles = hasFlag("--save-files");
   const shouldInject = !hasFlag("--no-inject");
   if (hasFlag("--from-dashboard")) {
@@ -479,61 +535,7 @@ async function main() {
     throw new Error(`Chrome not found: ${chromePath}`);
   }
   if (shouldSaveFiles) fs.mkdirSync(outDir, { recursive: true });
-  const userDataDir = path.join("/private/tmp", `wechat-chrome-${Date.now()}`);
-  const chromeArgs = [
-    `--remote-debugging-port=${port}`,
-    `--user-data-dir=${userDataDir}`,
-    "--no-first-run",
-    "--disable-popup-blocking",
-    "--disable-background-networking",
-    "--disable-breakpad",
-    "--disable-crash-reporter",
-    "--disable-crashpad",
-    "--disable-sync",
-    "--window-size=1280,1600",
-    "about:blank",
-  ];
-  if (process.env.WECHAT_HEADLESS === "1") chromeArgs.unshift("--headless=new");
-  const chrome = spawn(chromePath, chromeArgs, { stdio: ["ignore", "ignore", "pipe"] });
-  let stderr = "";
-  chrome.stderr.on("data", chunk => stderr += chunk.toString());
-  try {
-    await waitForDebugger(port);
-    const target = await requestJson(`http://127.0.0.1:${port}/json/new?${encodeURIComponent(url)}`, "PUT");
-    const socket = await connectWebSocket(target.webSocketDebuggerUrl);
-    const cdp = createCdpClient(socket);
-    await cdp.send("Page.enable");
-    await cdp.send("Runtime.enable");
-    await sleep(6500);
-    const result = await cdp.send("Runtime.evaluate", {
-      returnByValue: true,
-      awaitPromise: true,
-      expression: `(() => {
-        const text = selector => document.querySelector(selector)?.textContent?.trim().replace(/\\s+/g, " ") || "";
-        const attr = (selector, name) => document.querySelector(selector)?.getAttribute(name) || "";
-        const content = document.querySelector("#js_content");
-        const links = [...(content?.querySelectorAll("a[href]") || [])].map(a => ({ text: a.textContent.trim(), href: a.href })).filter(x => x.href);
-        const images = [...(content?.querySelectorAll("img") || [])].map(img => img.dataset.src || img.src).filter(Boolean);
-        return {
-          url: location.href,
-          title: text("#activity-name") || document.title,
-          account: text("#js_name"),
-          author: text("#js_author_name"),
-          publishTime: text("#publish_time"),
-          digest: attr('meta[property="og:description"]', "content") || attr('meta[name="description"]', "content"),
-          text: content?.innerText?.trim() || "",
-          html: content?.innerHTML || "",
-          images,
-          links,
-          blockedText: document.body.innerText.slice(0, 300),
-        };
-      })()`,
-    });
-    cdp.close();
-    const article = result.result.value;
-    const ok = article.title && article.text && article.text.length > 30 && !/环境异常|访问过于频繁|请在微信客户端打开|验证码/.test(article.blockedText || "");
-    article.ok = Boolean(ok);
-    article.fetchedAt = new Date().toISOString();
+  const article = await scrapeArticleWithPlaywright(url, chromePath);
     const candidates = article.ok ? articleToCandidates(article) : [];
     let injected = null;
     if (article.ok && shouldInject) {
@@ -559,12 +561,6 @@ async function main() {
       dashboardPath: shouldInject ? dashboardPath : null,
     }, null, 2));
     if (!article.ok) process.exitCode = 2;
-  } finally {
-    chrome.kill("SIGTERM");
-    await sleep(300);
-    if (!chrome.killed) chrome.kill("SIGKILL");
-    if (stderr && process.env.DEBUG_WECHAT_CHROME) console.error(stderr);
-  }
 }
 
 main().catch(error => {
