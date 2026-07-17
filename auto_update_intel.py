@@ -527,16 +527,39 @@ def direct_wechat_url(url: str) -> str | None:
     return match.group(0) if match else None
 
 
+def resolve_sogou_wechat_url(url: str) -> str | None:
+    """Resolve a Sogou temporary wrapper once, returning only a direct article URL."""
+    if "weixin.sogou.com/link" not in (url or ""):
+        return None
+    try:
+        request = Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 competitor-intel-bot/0.1",
+                "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5",
+            },
+        )
+        with urlopen(request, timeout=8) as response:
+            direct = direct_wechat_url(response.geturl())
+            if direct:
+                return direct
+            body = response.read(2_000_000).decode("utf-8", "ignore")
+        return direct_wechat_url(body)
+    except Exception:
+        return None
+
+
 def resolve_source_url(url: str) -> str:
     """Return a stable article URL when one is already present.
 
-    Search-engine redirect URLs are intentionally left untouched here. They
-    are not reliable article sources and must not be handed to a browser
-    refresh loop.
+    Search-engine wrappers are resolved once, but the wrapper itself is never
+    persisted or handed to the browser refresh loop.
     """
     direct = direct_wechat_url(url)
     if direct:
         return direct
+    if "weixin.sogou.com/link" in (url or ""):
+        return resolve_sogou_wechat_url(url) or ""
     return url
 
 
@@ -1092,6 +1115,9 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
                 print(f"[warn] {engine} {query}: {exc}")
         for candidate in candidates:
             resolved_url = resolve_source_url(candidate.get("sourceUrl", ""))
+            if not resolved_url:
+                print(f"[skip] unable to resolve temporary WeChat link: {candidate.get('title', '')}")
+                continue
             if resolved_url != candidate.get("sourceUrl"):
                 candidate["sourceUrl"] = resolved_url
                 candidate["sources"] = [source_object(resolved_url, f"{candidate.get('title', '')} {candidate.get('summary', '')}")]
