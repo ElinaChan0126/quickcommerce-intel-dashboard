@@ -799,6 +799,20 @@ def source_date(url: str) -> str | None:
     except Exception:
         return None
 
+    # 36氪文章页的标题下方 item-time 是文章真实发布日期；页面其他区域
+    # 还会出现推荐内容日期，因此不能直接取第一个 time 标签。
+    if "36kr.com/" in url:
+        match = re.search(
+            r'class=["\'][^"\']*\bitem-time\b[^"\']*["\'][^>]*>.*?'
+            r'(20\d{2}年\d{1,2}月\d{1,2}日)',
+            body,
+            flags=re.S,
+        )
+        if match:
+            parsed = parse_absolute_date(match.group(1))
+            if parsed:
+                return parsed
+
     # 优先读取结构化发布时间，避免把正文里的年份误判为文章日期。
     for tag in re.findall(r"<meta\b[^>]*>", body, flags=re.I):
         attrs = dict(re.findall(r"""([:\w-]+)\s*=\s*["']([^"']*)["']""", tag))
@@ -1086,7 +1100,7 @@ def parse_so_results(html_text: str) -> list[dict]:
 
 
 def leading_search_date(text: str) -> str | None:
-    # 仅用于 36氪新闻快讯：摘要开头通常就是快讯发布日期。
+    # 36氪文章和新闻快讯摘要开头通常就是文章发布日期。
     match = re.match(
         r"\s*(20\d{2}(?:年\d{1,2}月\d{1,2}日?|[-/]\d{1,2}[-/]\d{1,2}))",
         text or "",
@@ -1132,10 +1146,8 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
                 candidate_date = None
             if "mp.weixin.qq.com" not in candidate.get("sourceUrl", "") and candidate["score"] >= 70:
                 url = candidate.get("sourceUrl", "")
-                summary_date = leading_search_date(candidate.get("summary", ""))
-                if "36kr.com/newsflashes/" in url:
-                    # 36氪快讯摘要开头的日期是快讯发布日期，优先于页面索引时间。
-                    actual_date = KNOWN_SOURCE_DATES.get(url) or summary_date or source_date(url)
+                if "36kr.com/" in url:
+                    actual_date = KNOWN_SOURCE_DATES.get(url) or source_date(url)
                 else:
                     actual_date = KNOWN_SOURCE_DATES.get(url) or source_date(url)
                 if actual_date and not is_unreliable_current_date(candidate, actual_date):
@@ -1144,18 +1156,8 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
                     candidate_date = datetime.fromisoformat(actual_date).date()
                 else:
                     url = candidate.get("sourceUrl", "")
-                    fallback_date = (
-                        leading_search_date(candidate.get("summary", ""))
-                        if "36kr.com/newsflashes/" in url
-                        else None
-                    )
-                    if fallback_date and not is_unreliable_current_date(candidate, fallback_date):
-                        candidate["date"] = fallback_date
-                        candidate["publishedDate"] = fallback_date
-                        candidate_date = datetime.fromisoformat(fallback_date).date()
-                    else:
-                        # 普通文章不信任搜索摘要日期；没有来源页日期就不入新池。
-                        candidate_date = None
+                    # 没有来源页日期时，不信任搜索摘要日期，也不入新池。
+                    candidate_date = None
             if candidate_date is None:
                 # 没有文章页或搜索结果提供可验证日期时，宁可不入池。
                 continue
@@ -1231,10 +1233,8 @@ def refresh_existing_candidate_dates(candidates: list[dict]) -> list[dict]:
             continue
         if candidate.get("score", 0) < 70 or not url:
             continue
-        summary_date = leading_search_date(candidate.get("summary", ""))
-        if "36kr.com/newsflashes/" in url:
-            # 36氪快讯摘要开头的日期是快讯发布日期，优先于页面索引时间。
-            actual_date = summary_date or source_date(url)
+        if "36kr.com/" in url:
+            actual_date = source_date(url)
         else:
             actual_date = source_date(url)
         if actual_date and not is_unreliable_current_date(candidate, actual_date):
