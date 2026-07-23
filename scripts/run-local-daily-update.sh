@@ -37,7 +37,7 @@ if command -v git >/dev/null 2>&1; then
   fi
 fi
 
-"$PYTHON_BIN" auto_update_intel.py --dashboard index.html || echo "Web search failed; keeping existing candidates and skipping browser-based WeChat refresh."
+"$PYTHON_BIN" auto_update_intel.py --dashboard index.html || echo "Web search process failed; keeping existing candidates and continuing with WeChat refresh."
 WECHAT_SKILL="$ROOT_DIR/skills/wechat-article-scraper/scripts/scrape-wechat.js"
 if [[ -f "$WECHAT_SKILL" && -n "$NODE_BIN" ]]; then
   "$NODE_BIN" "$WECHAT_SKILL" --from-dashboard --dashboard index.html --limit "${WECHAT_LIMIT:-8}" || echo "Some WeChat full-text fetches failed; keeping successful candidates."

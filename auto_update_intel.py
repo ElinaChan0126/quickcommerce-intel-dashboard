@@ -12,6 +12,7 @@ import hashlib
 import html
 import json
 import re
+import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import quote
@@ -24,6 +25,15 @@ FALLBACK_DASHBOARD = Path(__file__).with_name("competitor-intel-dashboard.html")
 DASHBOARD = DEFAULT_DASHBOARD if DEFAULT_DASHBOARD.exists() else FALLBACK_DASHBOARD
 CN_TZ = timezone(timedelta(hours=8))
 RECENT_DAYS = 45
+FETCH_RETRIES = 3
+FETCH_BACKOFF_SECONDS = (1, 3)
+SEARCH_STATS = {
+    "queries": 0,
+    "engineRequests": 0,
+    "engineSuccesses": 0,
+    "engineFailures": 0,
+    "lastErrors": [],
+}
 
 DATA_SOURCES = [
     {"name": "36氪", "domain": "36kr.com", "focus": "即时零售、平台战略、融资快讯", "weight": 10},
@@ -487,16 +497,28 @@ EVENT_KEY_TERMS = [
 EVENT_SPLIT_RE = re.compile(r"[；;]\s*|(?<!\d)[。](?!\d)|\s+[|｜]\s+")
 
 
-def fetch(url: str, timeout: int = 18) -> str:
-    request = Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 competitor-intel-bot/0.1",
-            "Accept": "application/rss+xml,text/xml,text/html;q=0.8,*/*;q=0.5",
-        },
-    )
-    with urlopen(request, timeout=timeout) as response:
-        return response.read().decode("utf-8", "ignore")
+def fetch(url: str, timeout: int = 18, retries: int = FETCH_RETRIES) -> str:
+    last_error: Exception | None = None
+    for attempt in range(retries):
+        request = Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 competitor-intel-bot/0.1",
+                "Accept": "application/rss+xml,text/xml,text/html;q=0.8,*/*;q=0.5",
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.6",
+                "Cache-Control": "no-cache",
+            },
+        )
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                return response.read().decode("utf-8", "ignore")
+        except Exception as exc:
+            last_error = exc
+            if attempt < retries - 1:
+                time.sleep(FETCH_BACKOFF_SECONDS[min(attempt, len(FETCH_BACKOFF_SECONDS) - 1)])
+    if last_error:
+        raise last_error
+    raise RuntimeError(f"Unable to fetch {url}")
 
 
 def decode_js_string(value: str) -> str:
@@ -1109,23 +1131,30 @@ def leading_search_date(text: str) -> str | None:
 
 
 def collect_candidates(target_month: str | None = None) -> list[dict]:
+    SEARCH_STATS.update({"queries": 0, "engineRequests": 0, "engineSuccesses": 0, "engineFailures": 0, "lastErrors": []})
     seen = set()
     collected = []
     window_start, window_end = target_date_window(target_month)
     for query in build_queries(target_month):
+        SEARCH_STATS["queries"] += 1
         candidates = []
         urls = [
             ("bing", "https://www.bing.com/search?format=rss&q=" + quote(query)),
             ("so", "https://www.so.com/s?q=" + quote(query)),
         ]
         for engine, url in urls:
+            SEARCH_STATS["engineRequests"] += 1
             try:
                 body = fetch(url)
+                SEARCH_STATS["engineSuccesses"] += 1
                 if engine == "bing":
                     candidates.extend(parse_bing_rss(body))
                 elif engine == "so":
                     candidates.extend(parse_so_results(body))
             except Exception as exc:  # keep the daily job resilient
+                SEARCH_STATS["engineFailures"] += 1
+                if len(SEARCH_STATS["lastErrors"]) < 8:
+                    SEARCH_STATS["lastErrors"].append(f"{engine}: {exc}")
                 print(f"[warn] {engine} {query}: {exc}")
         for candidate in candidates:
             resolved_url = resolve_source_url(candidate.get("sourceUrl", ""))
@@ -1296,6 +1325,12 @@ def inject_candidates(dashboard: Path, candidates: list[dict], target_month: str
     normalized = normalize_published_fields(existing + candidates, collected_at)
     merged = recent_candidates(merge_candidates(normalized))
     updated_at = collected_at
+    if SEARCH_STATS["engineSuccesses"] == 0:
+        run_status = "search_failed"
+    elif candidates:
+        run_status = "completed"
+    else:
+        run_status = "no_new_content"
     meta = {
         "updatedAt": updated_at,
         "sourceCount": source_inventory_count(),
@@ -1303,7 +1338,8 @@ def inject_candidates(dashboard: Path, candidates: list[dict], target_month: str
         "candidateCount": len(merged),
         "newCandidateCount": len(candidates),
         "retentionDays": RECENT_DAYS,
-        "status": "completed",
+        "status": run_status,
+        "searchStats": SEARCH_STATS,
         "sourceWeights": source_weight_inventory(),
     }
     block = (
@@ -1336,10 +1372,9 @@ def main() -> None:
     if args.dry_run:
         print(json.dumps(candidates, ensure_ascii=False, indent=2))
         return
-    if not candidates and has_existing_generated_candidates(args.dashboard):
-        raise RuntimeError("本次未获取到候选，保留现有候选池；请检查网络或搜索源后重试。")
     inject_candidates(args.dashboard, candidates, args.month)
     retained = len(read_existing_generated_candidates(args.dashboard))
+    print(json.dumps({"status": SEARCH_STATS["engineSuccesses"] == 0 and "search_failed" or ("completed" if candidates else "no_new_content"), "searchStats": SEARCH_STATS}, ensure_ascii=False))
     print(f"updated {args.dashboard} with {len(candidates)} new candidates; {retained} retained candidates")
 
 

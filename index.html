@@ -2071,16 +2071,21 @@
       const scannedSources = Number(generatedMeta.sourceCount || 0);
       const queries = Number(generatedMeta.queryCount || 0);
       const updated = generatedMeta.updatedAt || "待运行";
-      const note = total
-        ? `最近一次自动抓取已完成，共抓到 ${total} 条候选；当前月份筛选、已入库和回收站规则后，还有 ${visible} 条待处理。`
-        : "最近一次自动抓取已完成，但没有抓到新的候选。你仍然可以从这里确认系统确实运行过。";
+      const runStatus = generatedMeta.status || "unknown";
+      const statusLabel = runStatus === "search_failed" ? "检索失败" : runStatus === "no_new_content" ? "无新增" : runStatus === "completed" ? "已完成" : "待运行";
+      const searchStats = generatedMeta.searchStats || {};
+      const note = runStatus === "search_failed"
+        ? `任务已启动，但本次搜索源均未返回结果；已保留现有候选池。失败请求 ${Number(searchStats.engineFailures || 0)} 次，下一次任务会自动重试。`
+        : runStatus === "no_new_content"
+          ? `搜索源正常返回，但没有发现符合日期和相关度规则的新线索；现有候选池保留 ${total} 条，当前仍有 ${visible} 条待处理。`
+          : `最近一次自动抓取已完成，本次新增 ${Number(generatedMeta.newCandidateCount || 0)} 条；候选池共保留 ${total} 条，当前月份筛选后还有 ${visible} 条待处理。`;
       status.innerHTML = `
         <div class="crawl-stat"><span>最近抓取</span><strong>${updated}</strong></div>
         <div class="crawl-stat"><span>扫描来源</span><strong>${scannedSources}</strong></div>
         <div class="crawl-stat"><span>检索组合</span><strong>${queries}</strong></div>
-        <div class="crawl-stat"><span>抓到候选</span><strong>${total}</strong></div>
+        <div class="crawl-stat"><span>本次新增</span><strong>${Number(generatedMeta.newCandidateCount || 0)}</strong></div>
         <div class="crawl-stat"><span>待处理</span><strong>${visible}</strong></div>
-        <div class="crawl-stat"><span>抓取频率</span><strong>每日 3 次</strong></div>
+        <div class="crawl-stat"><span>任务状态</span><strong>${statusLabel}</strong></div>
         <div class="crawl-note">${note}</div>
       `;
     }
