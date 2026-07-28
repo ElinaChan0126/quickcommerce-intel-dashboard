@@ -1354,7 +1354,10 @@ def inject_candidates(dashboard: Path, candidates: list[dict], target_month: str
     )
     if not pattern.search(text):
         raise RuntimeError("候选写入标记不存在，无法安全更新页面。")
-    dashboard.write_text(pattern.sub(block, text), encoding="utf-8")
+    # Use a callable replacement so backslashes in JSON stay escaped. A direct
+    # regex replacement would turn error-message "\\n" escapes into real line
+    # breaks and make the dashboard JavaScript invalid.
+    dashboard.write_text(pattern.sub(lambda _match: block, text), encoding="utf-8")
 
 
 def has_existing_generated_candidates(dashboard: Path) -> bool:
