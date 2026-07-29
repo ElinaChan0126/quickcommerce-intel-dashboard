@@ -37,7 +37,20 @@ if command -v git >/dev/null 2>&1; then
   fi
 fi
 
-"$PYTHON_BIN" auto_update_intel.py --dashboard index.html || echo "Web search process failed; keeping existing candidates and continuing with WeChat refresh."
+AUDIT_MARKER="$LOG_DIR/monthly-backfill-$(date '+%G-%V').done"
+if [[ "$(date '+%u')" == "1" && ! -f "$AUDIT_MARKER" ]]; then
+  # The first run each Monday re-checks the current month. The marker also
+  # makes this work when a sleeping Mac resumes after 09:45.
+  AUDIT_MONTH="$(date '+%Y-%m')"
+  echo "Running weekly monthly backfill for $AUDIT_MONTH"
+  if "$PYTHON_BIN" auto_update_intel.py --dashboard index.html --month "$AUDIT_MONTH"; then
+    touch "$AUDIT_MARKER"
+  else
+    echo "Monthly backfill failed; keeping existing candidates."
+  fi
+else
+  "$PYTHON_BIN" auto_update_intel.py --dashboard index.html || echo "Web search process failed; keeping existing candidates and continuing with WeChat refresh."
+fi
 WECHAT_SKILL="$ROOT_DIR/skills/wechat-article-scraper/scripts/scrape-wechat.js"
 if [[ -f "$WECHAT_SKILL" && -n "$NODE_BIN" ]]; then
   "$NODE_BIN" "$WECHAT_SKILL" --from-dashboard --dashboard index.html --limit "${WECHAT_LIMIT:-8}" || echo "Some WeChat full-text fetches failed; keeping successful candidates."

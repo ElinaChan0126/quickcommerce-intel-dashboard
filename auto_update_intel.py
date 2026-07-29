@@ -202,8 +202,11 @@ def period_labels(target_month: str | None = None) -> list[str]:
         except ValueError as exc:
             raise ValueError("--month must use YYYY-MM format") from exc
         return [f"{parsed.year}年{parsed.month}月"]
+    # Search engines often do not index the full day in the result snippet.
+    # Search within the current month, then use the verified article date below
+    # to keep the daily run restricted to today's publications.
     today = datetime.now(CN_TZ)
-    return [f"{today.year}年{today.month}月{today.day}日"]
+    return [f"{today.year}年{today.month}月"]
 
 
 def target_date_window(target_month: str | None = None) -> tuple[object, object]:
@@ -1173,7 +1176,7 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
                     candidate_date = datetime.fromisoformat(candidate["date"]).date()
             except ValueError:
                 candidate_date = None
-            if "mp.weixin.qq.com" not in candidate.get("sourceUrl", "") and candidate["score"] >= 70:
+            if "mp.weixin.qq.com" not in candidate.get("sourceUrl", ""):
                 url = candidate.get("sourceUrl", "")
                 if "36kr.com/" in url:
                     actual_date = KNOWN_SOURCE_DATES.get(url) or source_date(url)
@@ -1188,9 +1191,18 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
                     # 没有来源页日期时，不信任搜索摘要日期，也不入新池。
                     candidate_date = None
             if candidate_date is None:
-                # 没有文章页或搜索结果提供可验证日期时，宁可不入池。
-                continue
-            if candidate_date < window_start or candidate_date > window_end:
+                # A monthly audit should surface otherwise relevant leads even
+                # when the publisher hides its date. They are visibly marked
+                # for date verification and never treated as current-day news.
+                if not target_month:
+                    continue
+                candidate["dateStatus"] = "待确认日期"
+                candidate["judge"] = "文章页未提供可验证发布日期，已作为待确认日期线索保留；入库前请核验来源页。"
+                candidate["date"] = ""
+                candidate["publishedDate"] = ""
+            else:
+                candidate["dateStatus"] = "已验证"
+            if candidate_date and (candidate_date < window_start or candidate_date > window_end):
                 continue
             if any(part in candidate["sourceUrl"] for part in EXCLUDED_URL_PARTS):
                 continue
@@ -1205,7 +1217,9 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
                 continue
             seen.add(candidate["id"])
             collected.append(candidate)
-    return merge_candidates(collected)[:20]
+    # Keep all qualified candidates. The dashboard can group or collapse them,
+    # but a hard top-20 cap silently dropped valid lower-priority signals.
+    return merge_candidates(collected)
 
 
 def read_existing_generated_candidates(dashboard: Path) -> list[dict]:
@@ -1301,6 +1315,8 @@ def recent_candidates(candidates: list[dict]) -> list[dict]:
             candidate["publishedDate"] = published_date
             candidate["date"] = published_date
         except (TypeError, ValueError):
+            if candidate.get("dateStatus") == "待确认日期":
+                kept.append(candidate)
             continue
         if candidate_date >= cutoff and candidate_date <= today:
             kept.append(candidate)
