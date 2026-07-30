@@ -79,7 +79,6 @@ DATA_SOURCES = [
     {"name": "达达集团官网", "domain": "imdada.cn", "focus": "即时配送、京东到家、商家履约", "weight": 8},
     {"name": "京东到家官网", "domain": "jddj.com", "focus": "即时零售、商超便利、平台活动", "weight": 8},
     {"name": "饿了么官网", "domain": "ele.me", "focus": "本地生活、蜂鸟即配、平台活动", "weight": 8},
-    {"name": "公众号索引", "domain": "mp.weixin.qq.com", "focus": "平台官方、技术团队、行业自媒体", "weight": 5},
 ]
 
 WECHAT_ACCOUNTS = {
@@ -251,19 +250,6 @@ def build_queries(target_month: str | None = None) -> list[str]:
     source_focus_term = "即时配送 即时零售 闪购 跑腿 秒送 AI 上线"
     for source in HIGH_SIGNAL_SOURCES:
         source_queries.append(f"site:{source['domain']} {source_focus_term}")
-    account_queries = [
-        f"{account} 即时零售 闪购 外卖 跑腿 秒送 AI 上线"
-        for account in HIGH_SIGNAL_ACCOUNTS
-    ]
-    wechat_article_queries = [
-        f"site:mp.weixin.qq.com/s {account} {term}"
-        for account in HIGH_SIGNAL_ACCOUNTS
-        for term in [
-            "即时零售 闪购 跑腿 秒送",
-            "外卖 即时配送 新功能 上线",
-            "买家 下单 AI 入口 活动",
-        ]
-    ]
     platform_queries = PLATFORM_SEARCH_TERMS
     report_queries = [
         f"{broker} 即时零售 外卖 闪购 美团 京东 阿里 研报"
@@ -274,13 +260,13 @@ def build_queries(target_month: str | None = None) -> list[str]:
         for channel in NEWS_SEARCH_CHANNELS
     ]
     for period in period_labels(target_month):
-        for term in broad_terms + platform_terms + source_queries + account_queries + wechat_article_queries + platform_queries + report_queries + news_queries:
+        for term in broad_terms + platform_terms + source_queries + platform_queries + report_queries + news_queries:
             queries.append(f"{period} {term}")
     return queries
 
 
 def source_inventory_count() -> int:
-    return len(ALL_WEB_SOURCES) + len(ACCOUNT_TERMS) + len(PLATFORM_SEARCH_TERMS) + len(REPORT_SOURCES) + len(NEWS_SEARCH_CHANNELS)
+    return len(ALL_WEB_SOURCES) + len(PLATFORM_SEARCH_TERMS) + len(REPORT_SOURCES) + len(NEWS_SEARCH_CHANNELS)
 
 
 def source_weight_inventory() -> list[dict]:
@@ -293,16 +279,6 @@ def source_weight_inventory() -> list[dict]:
             "basis": "域名命中加分",
             "detail": f"{source['domain']} · {source['focus']}",
         })
-    high_signal_accounts = set(HIGH_SIGNAL_ACCOUNTS)
-    for group, accounts in WECHAT_ACCOUNTS.items():
-        for account in accounts:
-            rows.append({
-                "name": account,
-                "channel": f"公众号 · {group}",
-                "weight": 9 if account in high_signal_accounts else 6,
-                "basis": "公众号名命中加分",
-                "detail": "重点来源" if account in high_signal_accounts else "常规来源",
-            })
     for source in REPORT_SOURCES:
         rows.append({
             "name": source,
@@ -628,8 +604,6 @@ def source_name(url: str) -> str:
     for domain, source in SOURCE_LOOKUP.items():
         if domain in url:
             return source["name"]
-    if "weixin" in url:
-        return "公众号索引"
     host = re.sub(r"^https?://", "", url).split("/")[0]
     return host or "自动抓取"
 
@@ -646,9 +620,6 @@ def source_name_from_text(url: str, text: str) -> str:
     for domain, source in SOURCE_LOOKUP.items():
         if domain in url and "mp.weixin.qq.com" not in url:
             return source["name"]
-    account = account_from_text(text)
-    if account:
-        return account
     return source_name(url)
 
 
@@ -661,10 +632,6 @@ def source_weight(url: str) -> int:
 
 def term_source_weight(text: str) -> int:
     compact = re.sub(r"\s+", "", text)
-    if any(re.sub(r"\s+", "", account) in compact for account in HIGH_SIGNAL_ACCOUNTS):
-        return 9
-    if any(re.sub(r"\s+", "", account) in compact for account in ACCOUNT_TERMS):
-        return 6
     if any(term in text for term in PLATFORM_SEARCH_TERMS):
         return 5
     if any(source in text for source in REPORT_SOURCES):
@@ -942,7 +909,10 @@ def make_candidate(title: str, description: str, link: str, pub_date: str = "") 
     sources = [source_object(link, text)]
     relevance_score, relevance_reason = buyer_relevance(text)
     is_wechat = "mp.weixin.qq.com" in link
-    published_date = parse_date(pub_date, title)
+    # Search-engine pubDate can be an indexing time, so ignore it. A complete
+    # date explicitly shown in the result title or summary is still useful as
+    # a fallback when a publisher does not expose structured metadata.
+    published_date = parse_date("", f"{title} {description}") or leading_search_date(description)
     collected_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
     return {
         "id": candidate_id(link, title),
@@ -1160,6 +1130,10 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
                     SEARCH_STATS["lastErrors"].append(f"{engine}: {exc}")
                 print(f"[warn] {engine} {query}: {exc}")
         for candidate in candidates:
+            if "mp.weixin.qq.com" in candidate.get("sourceUrl", "") or "weixin.sogou.com" in candidate.get("sourceUrl", ""):
+                # Public-account articles are intentionally out of scope until
+                # there is a stable, authorized automated source.
+                continue
             resolved_url = resolve_source_url(candidate.get("sourceUrl", ""))
             if not resolved_url:
                 print(f"[skip] unable to resolve temporary WeChat link: {candidate.get('title', '')}")
@@ -1176,6 +1150,17 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
                     candidate_date = datetime.fromisoformat(candidate["date"]).date()
             except ValueError:
                 candidate_date = None
+            # A complete date present in a search snippet is enough to discard
+            # out-of-window results before opening the article page. This keeps
+            # month backfills fast and prevents old articles from consuming the
+            # source-date verification budget.
+            if candidate_date and (candidate_date < window_start or candidate_date > window_end):
+                continue
+            if not any(domain in candidate.get("sourceUrl", "") for domain in SOURCE_LOOKUP):
+                # Keep automated results to the curated web-source inventory.
+                # Generic aggregators and download sites caused most of the
+                # undated, low-quality candidates in the monthly backfill.
+                continue
             if "mp.weixin.qq.com" not in candidate.get("sourceUrl", ""):
                 url = candidate.get("sourceUrl", "")
                 if "36kr.com/" in url:
@@ -1191,18 +1176,12 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
                     # 没有来源页日期时，不信任搜索摘要日期，也不入新池。
                     candidate_date = None
             if candidate_date is None:
-                # A monthly audit should surface otherwise relevant leads even
-                # when the publisher hides its date. They are visibly marked
-                # for date verification and never treated as current-day news.
-                if not target_month:
-                    continue
-                candidate["dateStatus"] = "待确认日期"
-                candidate["judge"] = "文章页未提供可验证发布日期，已作为待确认日期线索保留；入库前请核验来源页。"
-                candidate["date"] = ""
-                candidate["publishedDate"] = ""
-            else:
-                candidate["dateStatus"] = "已验证"
-            if candidate_date and (candidate_date < window_start or candidate_date > window_end):
+                # Publication date is a hard requirement. Do not turn an
+                # unknown search result into a candidate that needs manual
+                # date triage; it creates too much noise and admits old news.
+                continue
+            candidate["dateStatus"] = "已验证" if actual_date else "来源摘要日期"
+            if candidate_date < window_start or candidate_date > window_end:
                 continue
             if any(part in candidate["sourceUrl"] for part in EXCLUDED_URL_PARTS):
                 continue
@@ -1267,10 +1246,21 @@ def refresh_existing_candidate_dates(candidates: list[dict]) -> list[dict]:
     for candidate in candidates:
         if candidate.get("type") != "自动候选":
             continue
+        if candidate.get("dateStatus") == "待确认日期":
+            # Previous monthly backfill versions admitted undated results.
+            # Clear them so recent_candidates drops them during the next write.
+            candidate["date"] = ""
+            candidate["publishedDate"] = ""
+            continue
         url = candidate.get("sourceUrl", "")
         if url in KNOWN_SOURCE_DATES:
             candidate["date"] = KNOWN_SOURCE_DATES[url]
             candidate["publishedDate"] = KNOWN_SOURCE_DATES[url]
+            candidate["dateStatus"] = "已验证"
+            continue
+        if candidate.get("publishedDate") or candidate.get("date"):
+            # Existing verified or explicitly dated candidates are stable; do
+            # not refetch every article on every scheduled run.
             continue
         if "mp.weixin.qq.com" in url:
             continue
@@ -1315,8 +1305,6 @@ def recent_candidates(candidates: list[dict]) -> list[dict]:
             candidate["publishedDate"] = published_date
             candidate["date"] = published_date
         except (TypeError, ValueError):
-            if candidate.get("dateStatus") == "待确认日期":
-                kept.append(candidate)
             continue
         if candidate_date >= cutoff and candidate_date <= today:
             kept.append(candidate)
@@ -1337,7 +1325,10 @@ def normalize_published_fields(candidates: list[dict], collected_at: str) -> lis
 def inject_candidates(dashboard: Path, candidates: list[dict], target_month: str | None = None) -> None:
     text = dashboard.read_text(encoding="utf-8")
     collected_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
-    existing = refresh_existing_candidate_dates(read_existing_generated_candidates(dashboard))
+    existing = [
+        candidate for candidate in refresh_existing_candidate_dates(read_existing_generated_candidates(dashboard))
+        if "mp.weixin.qq.com" not in candidate.get("sourceUrl", "") and candidate.get("sourceKind") != "公众号"
+    ]
     normalized = normalize_published_fields(existing + candidates, collected_at)
     merged = recent_candidates(merge_candidates(normalized))
     updated_at = collected_at
