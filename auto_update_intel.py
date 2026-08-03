@@ -926,7 +926,7 @@ def make_candidate(title: str, description: str, link: str, pub_date: str = "") 
         "businessTag": business_tag_from_text(text),
         "businessTags": business_tags_from_text(text),
         "summary": description[:180] or "搜索结果未提供摘要，请打开来源复核。",
-        "judge": "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。",
+        "judge": candidate_judgment(title, description, platform_from_text(text), business_tags_from_text(text)),
         "sourceName": sources[0]["name"],
         "sourceUrl": link,
         "sources": sources,
@@ -937,6 +937,28 @@ def make_candidate(title: str, description: str, link: str, pub_date: str = "") 
         "buyerRelevance": relevance_score,
         "relevanceReason": relevance_reason,
     }
+
+
+def candidate_judgment(title: str, summary: str, platform: str, tags: list[str]) -> str:
+    """Turn an article signal into a compact product-facing observation."""
+    text = f"{title} {summary}"
+    subject = platform if platform and platform != "待识别平台" else "该平台"
+
+    if any(word in text for word in ["支付宝 AI", "AI生态", "AI 生态", "智能体", "Agent", "一句话"]):
+        if any(word in text for word in ["跑腿", "同城", "秒送", "配送"]):
+            return f"{subject}正将即时配送入口接入 AI 对话场景，用户可从需求表达直接进入下单链路；值得关注 AI 入口对搜索、小程序入口及履约转化的影响。"
+        return f"{subject}正在把服务能力接入 AI 对话入口，关注其是否带来新的用户触点、转化路径或服务分发方式。"
+    if any(word in text for word in ["语音搜索", "搜索", "推荐", "猜你喜欢", "排序"]):
+        return f"{subject}在优化商品或服务发现路径，关注搜索/推荐能力是否缩短用户决策，并改变即时配送场景的流量分发。"
+    if any(word in text for word in ["补贴", "优惠", "券", "满减", "活动", "大促", "免单"]):
+        return f"{subject}通过运营权益拉动即时配送需求，关注补贴门槛、覆盖品类和活动持续周期，以及对用户留存和订单结构的影响。"
+    if any(word in text for word in ["骑手", "骑士", "配送员", "超时", "运力", "派单"]):
+        return f"{subject}在调整配送履约或骑手机制；买家侧需重点观察配送时效、服务承诺与异常体验是否同步变化。"
+    if any(word in text for word in ["商家", "门店", "商品", "品牌", "仓", "闪电仓"]):
+        return f"{subject}在扩充供给或优化商家经营能力，后续可关注这类供给变化是否转化为买家侧的品类丰富度、到家时效或价格竞争力。"
+    if "Buyer" in tags:
+        return f"该动态直接关联用户端的即时配送体验，建议继续跟踪其入口、下单、履约或售后链路是否形成可复制的产品能力。"
+    return f"该动态反映了{subject}在即时配送业务上的新动作，建议结合原文确认具体上线范围、目标用户与买家侧体验影响。"
 
 
 def candidates_from_result(title: str, description: str, link: str, pub_date: str = "") -> list[dict]:
@@ -1322,6 +1344,36 @@ def normalize_published_fields(candidates: list[dict], collected_at: str) -> lis
     return candidates
 
 
+def refresh_candidate_judgments(dashboard: Path) -> int:
+    """Replace the legacy workflow message without starting a new crawl."""
+    candidates = read_existing_generated_candidates(dashboard)
+    legacy_judge = "自动抓取候选，需确认是否为新上线功能、活动或平台能力变化。"
+    changed = 0
+    for candidate in candidates:
+        if candidate.get("judge") != legacy_judge:
+            continue
+        candidate["judge"] = candidate_judgment(
+            candidate.get("title", ""),
+            candidate.get("summary", ""),
+            candidate.get("platform", ""),
+            candidate.get("businessTags", []) or [],
+        )
+        changed += 1
+    if not changed:
+        return 0
+
+    text = dashboard.read_text(encoding="utf-8")
+    pattern = re.compile(
+        r"(const generatedCandidates\s*=\s*)\[.*?\](;\s*const generatedMeta)",
+        flags=re.S,
+    )
+    if not pattern.search(text):
+        raise RuntimeError("候选写入标记不存在，无法安全更新页面。")
+    replacement = lambda match: f"{match.group(1)}{json.dumps(candidates, ensure_ascii=False, indent=6)}{match.group(2)}"
+    dashboard.write_text(pattern.sub(replacement, text, count=1), encoding="utf-8")
+    return changed
+
+
 def inject_candidates(dashboard: Path, candidates: list[dict], target_month: str | None = None) -> None:
     text = dashboard.read_text(encoding="utf-8")
     collected_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
@@ -1376,7 +1428,12 @@ def main() -> None:
     parser.add_argument("--dashboard", type=Path, default=DASHBOARD, help="Dashboard HTML path.")
     parser.add_argument("--dry-run", action="store_true", help="Print candidates without editing HTML.")
     parser.add_argument("--month", help="Backfill a whole month in YYYY-MM format; default is today only.")
+    parser.add_argument("--refresh-judgments", action="store_true", help="Replace legacy generic candidate judgments without crawling.")
     args = parser.parse_args()
+
+    if args.refresh_judgments:
+        print(f"updated {refresh_candidate_judgments(args.dashboard)} candidate judgments")
+        return
 
     candidates = collect_candidates(args.month)
     if args.dry_run:
