@@ -1381,8 +1381,12 @@ def inject_candidates(dashboard: Path, candidates: list[dict], target_month: str
         candidate for candidate in refresh_existing_candidate_dates(read_existing_generated_candidates(dashboard))
         if "mp.weixin.qq.com" not in candidate.get("sourceUrl", "") and candidate.get("sourceKind") != "公众号"
     ]
+    existing_event_keys = {normalized_event_key(candidate) for candidate in existing}
     normalized = normalize_published_fields(existing + candidates, collected_at)
     merged = recent_candidates(merge_candidates(normalized))
+    # The dashboard is event-based. A fresh search result that only adds a
+    # source to an existing event must not be reported as a new candidate.
+    new_event_count = sum(1 for candidate in merged if candidate.get("eventKey") not in existing_event_keys)
     updated_at = collected_at
     if SEARCH_STATS["engineSuccesses"] == 0:
         run_status = "search_failed"
@@ -1395,7 +1399,7 @@ def inject_candidates(dashboard: Path, candidates: list[dict], target_month: str
         "sourceCount": source_inventory_count(),
         "queryCount": len(build_queries(target_month)),
         "candidateCount": len(merged),
-        "newCandidateCount": len(candidates),
+        "newCandidateCount": new_event_count,
         "retentionDays": RECENT_DAYS,
         "status": run_status,
         "searchStats": SEARCH_STATS,
