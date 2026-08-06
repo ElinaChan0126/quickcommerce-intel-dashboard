@@ -18,6 +18,8 @@ cat > "$PLIST" <<PLIST
     <string>/bin/bash</string>
     <string>$ROOT_DIR/scripts/run-local-daily-update.sh</string>
   </array>
+  <key>RunAtLoad</key>
+  <true/>
   <key>StartCalendarInterval</key>
   <array>
     <dict>
@@ -55,5 +57,5 @@ launchctl load "$PLIST"
 echo "Installed local scheduler:"
 echo "$PLIST"
 echo ""
-echo "It will run at 09:45, 14:45, and 20:45 every day while this Mac is awake."
+echo "It runs once after login/load, then at 09:45, 14:45, and 20:45 every day while this Mac is awake."
 echo "Log file: $ROOT_DIR/logs/local-daily-update.log"

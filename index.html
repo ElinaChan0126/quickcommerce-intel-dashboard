@@ -2290,17 +2290,33 @@
       const queries = Number(generatedMeta.queryCount || 0);
       const updated = generatedMeta.updatedAt || "待运行";
       const runStatus = generatedMeta.status || "unknown";
-      const statusLabel = runStatus === "search_failed" ? "检索失败" : runStatus === "no_new_content" ? "无新增" : runStatus === "completed" ? "已完成" : "待运行";
       const searchStats = generatedMeta.searchStats || {};
+      const hasDirectStats = Object.prototype.hasOwnProperty.call(searchStats, "directRequests");
+      const directRequests = Number(searchStats.directRequests || 0);
+      const directSuccesses = Number(searchStats.directSuccesses || 0);
+      const directFailures = Number(searchStats.directFailures || 0);
+      const searchRequests = Number(searchStats.engineRequests || 0);
+      const searchSuccesses = Number(searchStats.engineSuccesses || 0);
+      const searchFailures = Number(searchStats.engineFailures || 0);
+      const failedRequests = directFailures + searchFailures;
+      const lookbackDays = Number(generatedMeta.lookbackDays || 1);
+      const directDisplay = hasDirectStats ? `${directSuccesses}/${directRequests || "-"}` : "下次启用";
+      const statusLabel = runStatus === "search_failed" ? "抓取失败"
+        : runStatus === "degraded" ? "抓取不完整"
+          : runStatus === "no_new_content" ? "无新增"
+            : runStatus === "completed" ? "已完成" : "待运行";
       const note = runStatus === "search_failed"
-        ? `任务已启动，但本次搜索源均未返回结果；已保留现有候选池。失败请求 ${Number(searchStats.engineFailures || 0)} 次，下一次任务会自动重试。`
+        ? `任务已启动，但直连来源与 Bing 均未成功返回；已保留现有候选池。失败请求 ${failedRequests} 次，下一次任务会自动重试。`
+        : runStatus === "degraded"
+          ? `本次抓取部分可用：直连来源 ${directSuccesses}/${directRequests}，Bing ${searchSuccesses}/${searchRequests}；失败 ${failedRequests} 次。现有候选已保留，下一次任务会自动重试失败来源，不能据此判断行业没有新动态。`
         : runStatus === "no_new_content"
-          ? `搜索源正常返回，但没有发现符合日期和相关度规则的新线索；现有候选池保留 ${total} 条，当前仍有 ${visible} 条待处理。`
-          : `最近一次自动抓取已完成，本次新增 ${Number(generatedMeta.newCandidateCount || 0)} 条；候选池共保留 ${total} 条，当前月份筛选后还有 ${visible} 条待处理。`;
+          ? `${hasDirectStats ? `直连来源 ${directSuccesses}/${directRequests}、` : ""}Bing ${searchSuccesses}/${searchRequests} 已完成，但最近 ${lookbackDays} 天没有发现日期与相关度都通过校验的新线索；现有候选池保留 ${total} 条。`
+          : `最近一次自动抓取已完成：${hasDirectStats ? `直连来源 ${directSuccesses}/${directRequests}，` : "直连来源将从下一次任务启用，"}Bing ${searchSuccesses}/${searchRequests}；本次新增 ${Number(generatedMeta.newCandidateCount || 0)} 条事件，当前月份筛选后还有 ${visible} 条待处理。`;
       status.innerHTML = `
         <div class="crawl-stat"><span>最近抓取</span><strong>${updated}</strong></div>
         <div class="crawl-stat"><span>扫描来源</span><strong>${scannedSources}</strong></div>
-        <div class="crawl-stat"><span>检索组合</span><strong>${queries}</strong></div>
+        <div class="crawl-stat"><span>直连来源</span><strong>${directDisplay}</strong></div>
+        <div class="crawl-stat"><span>Bing 检索</span><strong>${searchSuccesses}/${searchRequests || queries || "-"}</strong></div>
         <div class="crawl-stat"><span>本次新增</span><strong>${Number(generatedMeta.newCandidateCount || 0)}</strong></div>
         <div class="crawl-stat"><span>待处理</span><strong>${visible}</strong></div>
         <div class="crawl-stat"><span>任务状态</span><strong>${statusLabel}</strong></div>

@@ -15,7 +15,7 @@ import re
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urljoin, urlparse
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
@@ -25,13 +25,16 @@ FALLBACK_DASHBOARD = Path(__file__).with_name("competitor-intel-dashboard.html")
 DASHBOARD = DEFAULT_DASHBOARD if DEFAULT_DASHBOARD.exists() else FALLBACK_DASHBOARD
 CN_TZ = timezone(timedelta(hours=8))
 RECENT_DAYS = 45
-FETCH_RETRIES = 3
-FETCH_BACKOFF_SECONDS = (1, 3)
+FETCH_RETRIES = 1
+FETCH_BACKOFF_SECONDS = (1,)
 SEARCH_STATS = {
     "queries": 0,
     "engineRequests": 0,
     "engineSuccesses": 0,
     "engineFailures": 0,
+    "directRequests": 0,
+    "directSuccesses": 0,
+    "directFailures": 0,
     "lastErrors": [],
 }
 
@@ -194,6 +197,17 @@ ALL_WEB_SOURCES = DATA_SOURCES + MERCHANT_WEB_SOURCES
 HIGH_SIGNAL_SOURCES = [source for source in ALL_WEB_SOURCES if source["weight"] >= 8]
 SOURCE_LOOKUP = {source["domain"]: source for source in ALL_WEB_SOURCES}
 
+# These are direct publisher indexes, deliberately kept separate from the
+# search fallback. A source may be temporarily unavailable without blocking
+# the rest of the run.
+DIRECT_SOURCE_PAGES = [
+    {"name": "美团新闻中心", "url": "https://www.meituan.com/news", "domain": "meituan.com"},
+    {"name": "美团技术团队", "url": "https://tech.meituan.com/", "domain": "tech.meituan.com"},
+    {"name": "顺丰同城官网", "url": "https://www.sf-cityrush.com/", "domain": "sf-cityrush.com"},
+    {"name": "闪送官网", "url": "https://www.ishansong.com/", "domain": "ishansong.com"},
+    {"name": "UU跑腿官网", "url": "https://www.uupt.com/", "domain": "uupt.com"},
+]
+
 def period_labels(target_month: str | None = None) -> list[str]:
     if target_month:
         try:
@@ -208,10 +222,12 @@ def period_labels(target_month: str | None = None) -> list[str]:
     return [f"{today.year}年{today.month}月"]
 
 
-def target_date_window(target_month: str | None = None) -> tuple[object, object]:
+def target_date_window(target_month: str | None = None, lookback_days: int = 3) -> tuple[object, object]:
     today = datetime.now(CN_TZ).date()
     if not target_month:
-        return today, today
+        # A short rolling window catches articles missed while a Mac is asleep,
+        # reconnecting to Wi-Fi, or recovering from a DNS outage.
+        return today - timedelta(days=max(0, lookback_days - 1)), today
     try:
         parsed = datetime.strptime(target_month, "%Y-%m").date()
     except ValueError as exc:
@@ -476,7 +492,7 @@ EVENT_KEY_TERMS = [
 EVENT_SPLIT_RE = re.compile(r"[；;]\s*|(?<!\d)[。](?!\d)|\s+[|｜]\s+")
 
 
-def fetch(url: str, timeout: int = 18, retries: int = FETCH_RETRIES) -> str:
+def fetch(url: str, timeout: int = 9, retries: int = FETCH_RETRIES) -> str:
     last_error: Exception | None = None
     for attempt in range(retries):
         request = Request(
@@ -743,10 +759,8 @@ def score_candidate(title: str, summary: str, url: str) -> int:
     for keyword, weight in NEGATIVE_KEYWORDS.items():
         if keyword in text:
             score -= weight
-    if "2026" in text:
+    if str(datetime.now(CN_TZ).year) in text:
         score += 6
-    if re.search(r"7月|07月|2026-07", text):
-        score += 10
     score += source_weight(url) + term_source_weight(text)
     relevance_score, _ = buyer_relevance(text)
     score += relevance_score
@@ -787,7 +801,7 @@ def parse_date(pub_date: str, text: str) -> str:
 
 def source_date(url: str) -> str | None:
     try:
-        body = fetch(url, timeout=12)
+        body = fetch(url, timeout=8)
     except Exception:
         return None
 
@@ -1116,6 +1130,88 @@ def parse_so_results(html_text: str) -> list[dict]:
     return candidates
 
 
+def direct_source_candidates(target_month: str | None, lookback_days: int) -> list[dict]:
+    """Collect recent, date-verified articles from stable publisher index pages."""
+    window_start, window_end = target_date_window(target_month, lookback_days)
+    collected: list[dict] = []
+    seen_urls: set[str] = set()
+    for source in DIRECT_SOURCE_PAGES:
+        source_candidates = 0
+        article_checks = 0
+        SEARCH_STATS["directRequests"] += 1
+        try:
+            page = fetch(source["url"], timeout=10)
+            SEARCH_STATS["directSuccesses"] += 1
+        except Exception as exc:
+            SEARCH_STATS["directFailures"] += 1
+            if len(SEARCH_STATS["lastErrors"]) < 8:
+                SEARCH_STATS["lastErrors"].append(f"direct {source['name']}: {exc}")
+            print(f"[warn] direct {source['name']}: {exc}")
+            continue
+
+        # Index markup varies by publisher; collecting visible anchors then
+        # validating each article page keeps this parser intentionally small.
+        for match in re.finditer(r"<a\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", page, flags=re.I | re.S):
+            href, anchor_html = match.groups()
+            url = urljoin(source["url"], html.unescape(href).strip())
+            parsed_url = urlparse(url)
+            if parsed_url.scheme not in {"http", "https"} or source["domain"] not in parsed_url.netloc:
+                continue
+            if url in seen_urls or url.rstrip("/") == source["url"].rstrip("/"):
+                continue
+            title = clean_text(anchor_html)
+            if len(title) < 10:
+                continue
+            nearby = clean_text(page[max(0, match.start() - 180):match.end() + 260])
+            event_candidates = candidates_from_result(title, nearby, url)
+            if not event_candidates:
+                continue
+            seen_urls.add(url)
+            # A source index can unexpectedly expose thousands of anchors.
+            # Bound article-page checks so one malformed page cannot starve the
+            # rest of the scheduled run.
+            article_checks += 1
+            if article_checks > 12:
+                break
+            SEARCH_STATS["directRequests"] += 1
+            try:
+                published_date = source_date(url)
+            except Exception as exc:
+                SEARCH_STATS["directFailures"] += 1
+                if len(SEARCH_STATS["lastErrors"]) < 8:
+                    SEARCH_STATS["lastErrors"].append(f"direct article {source['name']}: {exc}")
+                continue
+            if published_date:
+                SEARCH_STATS["directSuccesses"] += 1
+            else:
+                # The index itself worked, but this article did not expose a
+                # trustworthy publication date. Treat it as incomplete rather
+                # than inventing a date from the crawl time.
+                SEARCH_STATS["directFailures"] += 1
+                continue
+            for candidate in event_candidates:
+                if not published_date:
+                    continue
+                try:
+                    published = datetime.fromisoformat(published_date).date()
+                except ValueError:
+                    continue
+                if published < window_start or published > window_end:
+                    continue
+                candidate["date"] = published_date
+                candidate["publishedDate"] = published_date
+                candidate["dateStatus"] = "已验证"
+                candidate["sourceKind"] = "直连来源页"
+                candidate["contentStatus"] = "已读来源页索引"
+                collected.append(candidate)
+                source_candidates += 1
+            # Avoid turning a large publisher archive into hundreds of article
+            # page requests when its markup changes unexpectedly.
+            if source_candidates >= 8:
+                break
+    return collected
+
+
 def leading_search_date(text: str) -> str | None:
     # 36氪文章和新闻快讯摘要开头通常就是文章发布日期。
     match = re.match(
@@ -1125,18 +1221,26 @@ def leading_search_date(text: str) -> str | None:
     return parse_absolute_date(match.group(1)) if match else None
 
 
-def collect_candidates(target_month: str | None = None) -> list[dict]:
-    SEARCH_STATS.update({"queries": 0, "engineRequests": 0, "engineSuccesses": 0, "engineFailures": 0, "lastErrors": []})
+def collect_candidates(target_month: str | None = None, lookback_days: int = 3) -> list[dict]:
+    SEARCH_STATS.update({
+        "queries": 0,
+        "engineRequests": 0,
+        "engineSuccesses": 0,
+        "engineFailures": 0,
+        "directRequests": 0,
+        "directSuccesses": 0,
+        "directFailures": 0,
+        "lastErrors": [],
+    })
     seen = set()
-    collected = []
-    window_start, window_end = target_date_window(target_month)
+    collected = direct_source_candidates(target_month, lookback_days)
+    window_start, window_end = target_date_window(target_month, lookback_days)
     for query in build_queries(target_month):
         SEARCH_STATS["queries"] += 1
         candidates = []
-        urls = [
-            ("bing", "https://www.bing.com/search?format=rss&q=" + quote(query)),
-            ("so", "https://www.so.com/s?q=" + quote(query)),
-        ]
+        # Bing is discovery-only. Sogou is intentionally excluded because its
+        # anti-bot redirect loop made the scheduled job unreliable.
+        urls = [("bing", "https://www.bing.com/search?format=rss&q=" + quote(query))]
         for engine, url in urls:
             SEARCH_STATS["engineRequests"] += 1
             try:
@@ -1144,8 +1248,6 @@ def collect_candidates(target_month: str | None = None) -> list[dict]:
                 SEARCH_STATS["engineSuccesses"] += 1
                 if engine == "bing":
                     candidates.extend(parse_bing_rss(body))
-                elif engine == "so":
-                    candidates.extend(parse_so_results(body))
             except Exception as exc:  # keep the daily job resilient
                 SEARCH_STATS["engineFailures"] += 1
                 if len(SEARCH_STATS["lastErrors"]) < 8:
@@ -1374,7 +1476,23 @@ def refresh_candidate_judgments(dashboard: Path) -> int:
     return changed
 
 
-def inject_candidates(dashboard: Path, candidates: list[dict], target_month: str | None = None) -> None:
+def run_status() -> str:
+    successful = SEARCH_STATS["engineSuccesses"] + SEARCH_STATS["directSuccesses"]
+    failures = SEARCH_STATS["engineFailures"] + SEARCH_STATS["directFailures"]
+    attempted = SEARCH_STATS["engineRequests"] + SEARCH_STATS["directRequests"]
+    if successful == 0:
+        return "search_failed"
+    if attempted and failures / attempted >= 0.25:
+        return "degraded"
+    return "completed"
+
+
+def inject_candidates(
+    dashboard: Path,
+    candidates: list[dict],
+    target_month: str | None = None,
+    lookback_days: int = 3,
+) -> None:
     text = dashboard.read_text(encoding="utf-8")
     collected_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
     existing = [
@@ -1384,16 +1502,18 @@ def inject_candidates(dashboard: Path, candidates: list[dict], target_month: str
     existing_event_keys = {normalized_event_key(candidate) for candidate in existing}
     normalized = normalize_published_fields(existing + candidates, collected_at)
     merged = recent_candidates(merge_candidates(normalized))
+    status = run_status()
+    # A source outage must never turn an operational dashboard into a blank
+    # page. Preserve the last known candidate set until a healthy run can
+    # confirm the normal retention cleanup.
+    if not merged and existing and status in {"search_failed", "degraded"}:
+        merged = existing
     # The dashboard is event-based. A fresh search result that only adds a
     # source to an existing event must not be reported as a new candidate.
     new_event_count = sum(1 for candidate in merged if candidate.get("eventKey") not in existing_event_keys)
     updated_at = collected_at
-    if SEARCH_STATS["engineSuccesses"] == 0:
-        run_status = "search_failed"
-    elif candidates:
-        run_status = "completed"
-    else:
-        run_status = "no_new_content"
+    if status == "completed" and not candidates:
+        status = "no_new_content"
     meta = {
         "updatedAt": updated_at,
         "sourceCount": source_inventory_count(),
@@ -1401,7 +1521,8 @@ def inject_candidates(dashboard: Path, candidates: list[dict], target_month: str
         "candidateCount": len(merged),
         "newCandidateCount": new_event_count,
         "retentionDays": RECENT_DAYS,
-        "status": run_status,
+        "status": status,
+        "lookbackDays": lookback_days,
         "searchStats": SEARCH_STATS,
         "sourceWeights": source_weight_inventory(),
     }
@@ -1431,7 +1552,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Update quick-commerce intel candidates.")
     parser.add_argument("--dashboard", type=Path, default=DASHBOARD, help="Dashboard HTML path.")
     parser.add_argument("--dry-run", action="store_true", help="Print candidates without editing HTML.")
-    parser.add_argument("--month", help="Backfill a whole month in YYYY-MM format; default is today only.")
+    parser.add_argument("--month", help="Backfill a whole month in YYYY-MM format; default is a rolling recent window.")
+    parser.add_argument("--lookback-days", type=int, default=3, help="Recent-day recovery window for normal daily runs.")
     parser.add_argument("--refresh-judgments", action="store_true", help="Replace legacy generic candidate judgments without crawling.")
     args = parser.parse_args()
 
@@ -1439,13 +1561,19 @@ def main() -> None:
         print(f"updated {refresh_candidate_judgments(args.dashboard)} candidate judgments")
         return
 
-    candidates = collect_candidates(args.month)
+    if args.lookback_days < 1 or args.lookback_days > 14:
+        parser.error("--lookback-days must be between 1 and 14")
+
+    candidates = collect_candidates(args.month, args.lookback_days)
     if args.dry_run:
         print(json.dumps(candidates, ensure_ascii=False, indent=2))
         return
-    inject_candidates(args.dashboard, candidates, args.month)
+    inject_candidates(args.dashboard, candidates, args.month, args.lookback_days)
     retained = len(read_existing_generated_candidates(args.dashboard))
-    print(json.dumps({"status": SEARCH_STATS["engineSuccesses"] == 0 and "search_failed" or ("completed" if candidates else "no_new_content"), "searchStats": SEARCH_STATS}, ensure_ascii=False))
+    status = run_status()
+    if status == "completed" and not candidates:
+        status = "no_new_content"
+    print(json.dumps({"status": status, "searchStats": SEARCH_STATS}, ensure_ascii=False))
     print(f"updated {args.dashboard} with {len(candidates)} new candidates; {retained} retained candidates")
 
 
