@@ -22,16 +22,29 @@ if command -v git >/dev/null 2>&1; then
   fi
 fi
 
-AUDIT_MARKER="$LOG_DIR/monthly-backfill-$(date '+%G-%V').done"
-if [[ "$(date '+%u')" == "1" && ! -f "$AUDIT_MARKER" ]]; then
+WEEKLY_AUDIT_MARKER="$LOG_DIR/current-month-backfill-$(date '+%G-%V').done"
+PREVIOUS_MONTH="$(date -v-1m '+%Y-%m')"
+PREVIOUS_MONTH_MARKER="$LOG_DIR/previous-month-backfill-$PREVIOUS_MONTH.done"
+
+# Run this during the first week, rather than at one exact clock time, so a
+# sleeping or powered-off Mac can still recover the previous month when it
+# next becomes available.
+if [[ "$(date '+%d')" -le "07" && ! -f "$PREVIOUS_MONTH_MARKER" ]]; then
+  echo "Running previous-month backfill for $PREVIOUS_MONTH"
+  if "$PYTHON_BIN" auto_update_intel.py --dashboard index.html --month "$PREVIOUS_MONTH" --lookback-days "$LOOKBACK_DAYS"; then
+    touch "$PREVIOUS_MONTH_MARKER"
+  else
+    echo "Previous-month backfill failed; it will retry on the next scheduled run."
+  fi
+elif [[ "$(date '+%u')" == "1" && ! -f "$WEEKLY_AUDIT_MARKER" ]]; then
   # The first run each Monday re-checks the current month. The marker also
   # makes this work when a sleeping Mac resumes after 09:45.
   AUDIT_MONTH="$(date '+%Y-%m')"
   echo "Running weekly monthly backfill for $AUDIT_MONTH"
   if "$PYTHON_BIN" auto_update_intel.py --dashboard index.html --month "$AUDIT_MONTH" --lookback-days "$LOOKBACK_DAYS"; then
-    touch "$AUDIT_MARKER"
+    touch "$WEEKLY_AUDIT_MARKER"
   else
-    echo "Monthly backfill failed; keeping existing candidates."
+    echo "Current-month backfill failed; it will retry on the next scheduled run."
   fi
 else
   "$PYTHON_BIN" auto_update_intel.py --dashboard index.html --lookback-days "$LOOKBACK_DAYS" || echo "Web search process failed; keeping existing candidates."
