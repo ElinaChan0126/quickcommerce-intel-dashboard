@@ -2112,6 +2112,46 @@
       if (tags.includes("Driver")) return "公众号全文偏骑手或运力规则，建议关注对时效、供给稳定性和用户履约体验的间接影响。";
       return item.judge || "已补充公众号全文，建议产品经理复核事件真实性、发布时间和业务影响。";
     }
+    function isLegacyJudge(judge) {
+      return /^(自动抓取候选|待产品经理补充判断)/.test((judge || "").trim());
+    }
+    function productJudge(item) {
+      const text = cleanBusinessText(`${item.platform || ""} ${item.title || ""} ${item.summary || ""}`);
+      const platform = item.platform && item.platform !== "待识别平台" ? item.platform : "该平台";
+      const tags = businessTagsOf(item);
+      if (/(支付宝\s*AI|AI生态|智能体|Agent|一句话)/i.test(text) && /(跑腿|同城|秒送|配送)/.test(text)) {
+        return `${platform}正将即时配送入口接入 AI 对话场景，用户可从需求表达直接进入下单链路；值得关注 AI 入口对搜索、小程序入口及履约转化的影响。`;
+      }
+      if (/(语音搜索|搜索|推荐|猜你喜欢|排序)/.test(text)) {
+        return `${platform}在优化商品或服务发现路径，关注搜索/推荐能力是否缩短用户决策，并改变即时配送场景的流量分发。`;
+      }
+      if (/(补贴|优惠|券|满减|活动|大促|免单)/.test(text)) {
+        return `${platform}通过运营权益拉动即时配送需求，关注补贴门槛、覆盖品类和持续周期，以及对用户留存和订单结构的影响。`;
+      }
+      if (/(骑手|骑士|配送员|超时|运力|派单)/.test(text)) {
+        return `${platform}在调整配送履约或运力机制；买家侧需重点观察配送时效、服务承诺与异常体验是否同步变化。`;
+      }
+      if (/(商家|门店|商品|品牌|仓|闪电仓)/.test(text)) {
+        return `${platform}在扩充供给或优化经营能力，后续可关注这类变化是否转化为买家侧的品类丰富度、到家时效或价格竞争力。`;
+      }
+      if (tags.includes("Buyer")) {
+        return "该动态直接关联用户端的即时配送体验，建议继续跟踪其入口、下单、履约或售后链路是否形成可复制的产品能力。";
+      }
+      return `该动态反映了${platform}在即时配送业务上的新动作，建议结合原文确认上线范围、目标用户与买家侧体验影响。`;
+    }
+    function preferredJudge(item) {
+      return isLegacyJudge(item.judge) ? productJudge(item) : (item.judge || productJudge(item));
+    }
+    function refreshLegacyCustomJudges() {
+      const custom = getCustom();
+      let changed = false;
+      const refreshed = custom.map(item => {
+        if (!isLegacyJudge(item.judge)) return item;
+        changed = true;
+        return { ...item, judge: productJudge(item) };
+      });
+      if (changed) setCustom(refreshed);
+    }
     function parseFullTextForCandidate(item, fullText) {
       const text = cleanPastedFullText(fullText);
       const title = inferTitleFromFullText(text, item);
@@ -2466,7 +2506,7 @@
             businessTag: businessTagsOf(item)[0] || "",
             businessTags: businessTagsOf(item),
             summary: item.summary,
-            judge: item.judge || "自动抓取候选，已确认入库，建议在日报会上补充业务影响判断。",
+            judge: preferredJudge(item),
             sourceName: item.sourceName || "自动抓取",
             sourceUrl: item.sourceUrl,
             sources: itemSources(item),
@@ -2792,6 +2832,7 @@
     els.month.addEventListener("change", () => syncMonth(els.month));
     els.listMonth.addEventListener("change", () => syncMonth(els.listMonth));
     renderFilters();
+    refreshLegacyCustomJudges();
     initSideNavigation();
     initCollapsibleModules();
     renderCandidates();
