@@ -204,7 +204,10 @@ DIRECT_SOURCE_PAGES = [
     {"name": "美团新闻中心", "url": "https://www.meituan.com/news", "domain": "meituan.com"},
     {"name": "美团技术团队", "url": "https://tech.meituan.com/", "domain": "tech.meituan.com"},
     {"name": "顺丰同城官网", "url": "https://www.sf-cityrush.com/", "domain": "sf-cityrush.com"},
-    {"name": "闪送官网", "url": "https://www.ishansong.com/", "domain": "ishansong.com"},
+    # The homepage is marketing-first and does not expose an article archive.
+    # Use the official news list instead, with a wider first-party recovery
+    # window so a newly enabled connector can recover recently missed news.
+    {"name": "闪送官网", "url": "https://www.ishansong.com/news/list?type=15", "domain": "ishansong.com", "recoveryDays": 45},
     {"name": "UU跑腿官网", "url": "https://www.uupt.com/", "domain": "uupt.com"},
 ]
 
@@ -819,6 +822,17 @@ def source_date(url: str) -> str | None:
             if parsed:
                 return parsed
 
+    # FlashEx's official detail pages render a visible publication date but do
+    # not consistently provide article:published_time metadata. Only inspect
+    # the first page block, before related-reading cards introduce older dates.
+    if "ishansong.com/news/detail" in url:
+        header_text = clean_text(body[:12000])
+        match = re.search(r"(20\d{2}年\d{1,2}月\d{1,2}日)", header_text)
+        if match:
+            parsed = parse_absolute_date(match.group(1))
+            if parsed:
+                return parsed
+
     # 优先读取结构化发布时间，避免把正文里的年份误判为文章日期。
     for tag in re.findall(r"<meta\b[^>]*>", body, flags=re.I):
         attrs = dict(re.findall(r"""([:\w-]+)\s*=\s*["']([^"']*)["']""", tag))
@@ -1138,6 +1152,10 @@ def direct_source_candidates(target_month: str | None, lookback_days: int) -> li
     for source in DIRECT_SOURCE_PAGES:
         source_candidates = 0
         article_checks = 0
+        source_window_start = window_start
+        if not target_month and source.get("recoveryDays"):
+            recovery_start = datetime.now(CN_TZ).date() - timedelta(days=int(source["recoveryDays"]) - 1)
+            source_window_start = min(source_window_start, recovery_start)
         SEARCH_STATS["directRequests"] += 1
         try:
             page = fetch(source["url"], timeout=10)
@@ -1166,6 +1184,10 @@ def direct_source_candidates(target_month: str | None, lookback_days: int) -> li
             event_candidates = candidates_from_result(title, nearby, url)
             if not event_candidates:
                 continue
+            # First-party news lists often print the publication date next to
+            # the title. It is a safe fallback when an individual detail page
+            # is temporarily unreachable (for example, a local DNS outage).
+            list_date = parse_absolute_date(f"{title} {nearby}")
             seen_urls.add(url)
             # A source index can unexpectedly expose thousands of anchors.
             # Bound article-page checks so one malformed page cannot starve the
@@ -1181,6 +1203,7 @@ def direct_source_candidates(target_month: str | None, lookback_days: int) -> li
                 if len(SEARCH_STATS["lastErrors"]) < 8:
                     SEARCH_STATS["lastErrors"].append(f"direct article {source['name']}: {exc}")
                 continue
+            published_date = published_date or list_date
             if published_date:
                 SEARCH_STATS["directSuccesses"] += 1
             else:
@@ -1196,11 +1219,11 @@ def direct_source_candidates(target_month: str | None, lookback_days: int) -> li
                     published = datetime.fromisoformat(published_date).date()
                 except ValueError:
                     continue
-                if published < window_start or published > window_end:
+                if published < source_window_start or published > window_end:
                     continue
                 candidate["date"] = published_date
                 candidate["publishedDate"] = published_date
-                candidate["dateStatus"] = "已验证"
+                candidate["dateStatus"] = "已验证" if published_date != list_date else "官网列表日期"
                 candidate["sourceKind"] = "直连来源页"
                 candidate["contentStatus"] = "已读来源页索引"
                 collected.append(candidate)
@@ -1480,8 +1503,18 @@ def run_status() -> str:
     successful = SEARCH_STATS["engineSuccesses"] + SEARCH_STATS["directSuccesses"]
     failures = SEARCH_STATS["engineFailures"] + SEARCH_STATS["directFailures"]
     attempted = SEARCH_STATS["engineRequests"] + SEARCH_STATS["directRequests"]
+    direct_attempted = SEARCH_STATS["directRequests"]
+    engine_attempted = SEARCH_STATS["engineRequests"]
     if successful == 0:
         return "search_failed"
+    # Treat one substantially broken channel as degraded even when the other
+    # channel keeps the aggregate failure ratio below the global threshold.
+    # Otherwise a failed first-party feed could be hidden by many successful
+    # Bing requests and falsely look like complete coverage.
+    if direct_attempted and SEARCH_STATS["directFailures"] / direct_attempted >= 0.5:
+        return "degraded"
+    if engine_attempted and SEARCH_STATS["engineFailures"] / engine_attempted >= 0.5:
+        return "degraded"
     if attempted and failures / attempted >= 0.25:
         return "degraded"
     return "completed"
