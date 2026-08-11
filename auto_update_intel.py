@@ -35,8 +35,13 @@ SEARCH_STATS = {
     "directRequests": 0,
     "directSuccesses": 0,
     "directFailures": 0,
+    "directSources": {},
     "lastErrors": [],
 }
+# A result can be returned by more than one query or official index in a
+# single run. Reuse its verified date instead of repeatedly requesting the
+# article page, which reduces rate-limit failures and keeps one run coherent.
+SOURCE_DATE_CACHE: dict[str, str | None] = {}
 
 DATA_SOURCES = [
     {"name": "36氪", "domain": "36kr.com", "focus": "即时零售、平台战略、融资快讯", "weight": 10},
@@ -202,6 +207,9 @@ SOURCE_LOOKUP = {source["domain"]: source for source in ALL_WEB_SOURCES}
 # the rest of the run.
 DIRECT_SOURCE_PAGES = [
     {"name": "美团新闻中心", "url": "https://www.meituan.com/news", "domain": "meituan.com", "recoveryDays": 45},
+    # The general landing page can be JavaScript-rendered. This official
+    # category archive provides an independent, rider-related discovery path.
+    {"name": "美团骑手保障新闻", "url": "https://www.meituan.com/news?category=6", "domain": "meituan.com", "recoveryDays": 45},
     {"name": "美团技术团队", "url": "https://tech.meituan.com/", "domain": "tech.meituan.com"},
     {"name": "顺丰同城官网", "url": "https://www.sf-cityrush.com/", "domain": "sf-cityrush.com"},
     # The homepage is marketing-first and does not expose an article archive.
@@ -471,6 +479,8 @@ BUSINESS_TAG_RULES = [
 
 DRIVER_EXCLUDE_TERMS = ["用户", "消费者", "下单", "入口", "支付宝", "阿宝", "AI助手", "智能下单", "自然语言", "语音", "小程序"]
 BUSINESS_PLACEHOLDER_TEXT = "搜索结果未提供摘要，请打开来源复核。"
+DRIVER_OPERATION_TERMS = ["骑手", "骑士", "配送员", "运力", "等灯停表", "超时", "免罚", "派单", "配送安全"]
+EVENT_ACTION_TERMS = ["上线", "发布", "接入", "启动", "开启", "升级", "试点", "活动", "规则", "权益"]
 
 EVENT_KEY_TERMS = [
     "支付宝",
@@ -769,6 +779,12 @@ def score_candidate(title: str, summary: str, url: str) -> int:
             score -= weight
     if str(datetime.now(CN_TZ).year) in text:
         score += 6
+    # Delivery-side mechanisms are not buyer features by default, but a
+    # confirmed launch or pilot can change fulfilment safety, timeliness or
+    # service promises. Keep those industry signals in the candidate pool
+    # without giving them an artificial Buyer tag.
+    if any(term in text for term in DRIVER_OPERATION_TERMS) and any(action in text for action in EVENT_ACTION_TERMS):
+        score += 12
     score += source_weight(url) + term_source_weight(text)
     relevance_score, _ = buyer_relevance(text)
     score += relevance_score
@@ -807,7 +823,7 @@ def parse_date(pub_date: str, text: str) -> str:
     return parse_absolute_date(text) or ""
 
 
-def source_date(url: str) -> str | None:
+def _source_date_uncached(url: str) -> str | None:
     try:
         body = fetch(url, timeout=8)
     except Exception:
@@ -872,6 +888,12 @@ def source_date(url: str) -> str | None:
     # ct is a WeChat-specific timestamp and is not reliable on generic web pages.
     # WeChat candidates use their own article parser, so do not use it here.
     return None
+
+
+def source_date(url: str) -> str | None:
+    if url not in SOURCE_DATE_CACHE:
+        SOURCE_DATE_CACHE[url] = _source_date_uncached(url)
+    return SOURCE_DATE_CACHE[url]
 
 
 def candidate_id(url: str, title: str) -> str:
@@ -1168,6 +1190,15 @@ def direct_source_candidates(target_month: str | None, lookback_days: int) -> li
     for source in DIRECT_SOURCE_PAGES:
         source_candidates = 0
         article_checks = 0
+        source_health = {
+            "indexFetched": False,
+            "contentLinks": 0,
+            "eligibleLinks": 0,
+            "articleChecks": 0,
+            "dateVerified": 0,
+            "accepted": 0,
+        }
+        SEARCH_STATS["directSources"][source["name"]] = source_health
         source_window_start = window_start
         if not target_month and source.get("recoveryDays"):
             recovery_start = datetime.now(CN_TZ).date() - timedelta(days=int(source["recoveryDays"]) - 1)
@@ -1176,10 +1207,12 @@ def direct_source_candidates(target_month: str | None, lookback_days: int) -> li
         try:
             page = fetch(source["url"], timeout=10)
             SEARCH_STATS["directSuccesses"] += 1
+            source_health["indexFetched"] = True
         except Exception as exc:
             SEARCH_STATS["directFailures"] += 1
             if len(SEARCH_STATS["lastErrors"]) < 8:
                 SEARCH_STATS["lastErrors"].append(f"direct {source['name']}: {exc}")
+            source_health["error"] = type(exc).__name__
             print(f"[warn] direct {source['name']}: {exc}")
             continue
 
@@ -1193,13 +1226,25 @@ def direct_source_candidates(target_month: str | None, lookback_days: int) -> li
                 continue
             if url in seen_urls or url.rstrip("/") == source["url"].rstrip("/"):
                 continue
-            title = clean_text(anchor_html)
+            card_text = clean_text(anchor_html)
+            title = card_text
+            # Card-style official archives often wrap a title, summary and
+            # category/date in one anchor. Prefer the semantic heading so the
+            # dashboard title does not inherit navigation or card metadata.
+            heading = re.search(r"<h[1-3]\b[^>]*>(.*?)</h[1-3]>", anchor_html, flags=re.I | re.S)
+            if heading:
+                title = clean_text(heading.group(1))
             if len(title) < 10:
                 continue
-            nearby = clean_text(page[max(0, match.start() - 180):match.end() + 260])
+            source_health["contentLinks"] += 1
+            # Use the complete card rather than a byte slice around it. A
+            # slice can begin inside an HTML attribute and leak CSS text into
+            # the candidate summary.
+            nearby = card_text
             event_candidates = candidates_from_result(title, nearby, url)
             if not event_candidates:
                 continue
+            source_health["eligibleLinks"] += 1
             # First-party news lists often print the publication date next to
             # the title. It is a safe fallback when an individual detail page
             # is temporarily unreachable (for example, a local DNS outage).
@@ -1211,6 +1256,7 @@ def direct_source_candidates(target_month: str | None, lookback_days: int) -> li
             article_checks += 1
             if article_checks > 12:
                 break
+            source_health["articleChecks"] = article_checks
             SEARCH_STATS["directRequests"] += 1
             try:
                 published_date = source_date(url)
@@ -1222,6 +1268,7 @@ def direct_source_candidates(target_month: str | None, lookback_days: int) -> li
             published_date = published_date or list_date
             if published_date:
                 SEARCH_STATS["directSuccesses"] += 1
+                source_health["dateVerified"] += 1
             else:
                 # The index itself worked, but this article did not expose a
                 # trustworthy publication date. Treat it as incomplete rather
@@ -1244,6 +1291,7 @@ def direct_source_candidates(target_month: str | None, lookback_days: int) -> li
                 candidate["contentStatus"] = "已读来源页索引"
                 collected.append(candidate)
                 source_candidates += 1
+                source_health["accepted"] += 1
             # Avoid turning a large publisher archive into hundreds of article
             # page requests when its markup changes unexpectedly.
             if source_candidates >= 8:
@@ -1269,6 +1317,7 @@ def collect_candidates(target_month: str | None = None, lookback_days: int = 3) 
         "directRequests": 0,
         "directSuccesses": 0,
         "directFailures": 0,
+        "directSources": {},
         "lastErrors": [],
     })
     seen = set()
@@ -1523,6 +1572,12 @@ def run_status() -> str:
     engine_attempted = SEARCH_STATS["engineRequests"]
     if successful == 0:
         return "search_failed"
+    # An index page that opens but exposes no usable article links is not a
+    # healthy direct source. Mark coverage incomplete instead of silently
+    # treating a JavaScript-only archive as a successful crawl.
+    direct_sources = SEARCH_STATS.get("directSources", {})
+    if any(stats.get("indexFetched") and stats.get("contentLinks", 0) == 0 for stats in direct_sources.values()):
+        return "degraded"
     # Treat one substantially broken channel as degraded even when the other
     # channel keeps the aggregate failure ratio below the global threshold.
     # Otherwise a failed first-party feed could be hidden by many successful

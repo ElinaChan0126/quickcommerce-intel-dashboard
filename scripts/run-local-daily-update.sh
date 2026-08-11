@@ -10,9 +10,35 @@ LOOKBACK_DAYS="${LOOKBACK_DAYS:-3}"
 mkdir -p "$LOG_DIR"
 exec >>"$LOG_FILE" 2>&1
 
+# LaunchAgent can start at login and near a scheduled slot. Keep exactly one
+# writer so concurrent crawls cannot race while replacing index.html.
+LOCK_DIR="$LOG_DIR/.daily-update.lock"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  # A terminated process can leave an empty lock directory behind. Reclaim it
+  # only after a generous timeout; normal runs finish in a few minutes.
+  find "$LOCK_DIR" -maxdepth 0 -mmin +30 -exec rmdir {} \; 2>/dev/null || true
+  if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    echo "Another daily update is still running; skip this trigger."
+    exit 0
+  fi
+fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+
 echo ""
 echo "===== $(date '+%Y-%m-%d %H:%M:%S') local daily update start ====="
 cd "$ROOT_DIR"
+
+push_pending_commits() {
+  local attempt
+  for attempt in 1 2 3; do
+    if git push origin main; then
+      return 0
+    fi
+    echo "git push attempt $attempt failed; retrying after a short delay."
+    sleep "$((attempt * 5))"
+  done
+  return 1
+}
 
 if command -v git >/dev/null 2>&1; then
   if git diff --quiet && git diff --cached --quiet; then
@@ -57,7 +83,16 @@ else
   git config user.email "local-intel-bot@example.local"
   git add index.html
   git commit -m "chore: local daily intel update"
-  git push origin main
+fi
+
+# A failed push can happen while the Mac is waking or the network changes.
+# Do this even when today's crawl added nothing, so an earlier committed
+# dashboard update is not silently stranded on the local machine.
+ahead_count="$(git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)"
+if [[ "$ahead_count" != "0" ]]; then
+  if ! push_pending_commits; then
+    echo "git push still failed; local commit is retained and will retry on the next run."
+  fi
 fi
 
 echo "===== $(date '+%Y-%m-%d %H:%M:%S') local daily update end ====="
