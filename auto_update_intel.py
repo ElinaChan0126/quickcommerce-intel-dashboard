@@ -201,7 +201,7 @@ SOURCE_LOOKUP = {source["domain"]: source for source in ALL_WEB_SOURCES}
 # search fallback. A source may be temporarily unavailable without blocking
 # the rest of the run.
 DIRECT_SOURCE_PAGES = [
-    {"name": "美团新闻中心", "url": "https://www.meituan.com/news", "domain": "meituan.com"},
+    {"name": "美团新闻中心", "url": "https://www.meituan.com/news", "domain": "meituan.com", "recoveryDays": 45},
     {"name": "美团技术团队", "url": "https://tech.meituan.com/", "domain": "tech.meituan.com"},
     {"name": "顺丰同城官网", "url": "https://www.sf-cityrush.com/", "domain": "sf-cityrush.com"},
     # The homepage is marketing-first and does not expose an article archive.
@@ -265,6 +265,11 @@ def build_queries(target_month: str | None = None) -> list[str]:
         "京东秒送 京东外卖 秒送 活动",
         "美团闪购 即时零售 上线 活动",
     ]
+    official_news_terms = [
+        "site:meituan.com/news 骑手 上线",
+        "site:meituan.com/news 配送 产品",
+        "site:ishansong.com/news 跑腿 上线",
+    ]
     source_queries = []
     source_focus_term = "即时配送 即时零售 闪购 跑腿 秒送 AI 上线"
     for source in HIGH_SIGNAL_SOURCES:
@@ -279,7 +284,7 @@ def build_queries(target_month: str | None = None) -> list[str]:
         for channel in NEWS_SEARCH_CHANNELS
     ]
     for period in period_labels(target_month):
-        for term in broad_terms + platform_terms + source_queries + platform_queries + report_queries + news_queries:
+        for term in broad_terms + platform_terms + official_news_terms + source_queries + platform_queries + report_queries + news_queries:
             queries.append(f"{period} {term}")
     return queries
 
@@ -817,6 +822,17 @@ def source_date(url: str) -> str | None:
             body,
             flags=re.S,
         )
+        if match:
+            parsed = parse_absolute_date(match.group(1))
+            if parsed:
+                return parsed
+
+    # Meituan's official news detail pages expose the publication date as
+    # visible header text (for example, "骑手保障 2026-07-31") rather than
+    # reliable article metadata.
+    if "meituan.com/news/" in url:
+        header_text = clean_text(body)
+        match = re.search(r"(?:骑手保障|商家生态|食品安全|算法公开|新闻中心)\s*(20\d{2}(?:[-/]\d{1,2}[-/]\d{1,2}|年\d{1,2}月\d{1,2}日))", header_text)
         if match:
             parsed = parse_absolute_date(match.group(1))
             if parsed:

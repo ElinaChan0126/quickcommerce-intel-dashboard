@@ -26,10 +26,10 @@ WEEKLY_AUDIT_MARKER="$LOG_DIR/current-month-backfill-$(date '+%G-%V').done"
 PREVIOUS_MONTH="$(date -v-1m '+%Y-%m')"
 PREVIOUS_MONTH_MARKER="$LOG_DIR/previous-month-backfill-$PREVIOUS_MONTH.done"
 
-# Run this during the first week, rather than at one exact clock time, so a
-# sleeping or powered-off Mac can still recover the previous month when it
-# next becomes available.
-if [[ "$(date '+%d')" -le "07" && ! -f "$PREVIOUS_MONTH_MARKER" ]]; then
+# Run once whenever the previous-month marker is missing. This lets a sleeping
+# or powered-off Mac recover the prior month even if it is first available
+# after the first week of the new month.
+if [[ ! -f "$PREVIOUS_MONTH_MARKER" ]]; then
   echo "Running previous-month backfill for $PREVIOUS_MONTH"
   if "$PYTHON_BIN" auto_update_intel.py --dashboard index.html --month "$PREVIOUS_MONTH" --lookback-days "$LOOKBACK_DAYS"; then
     touch "$PREVIOUS_MONTH_MARKER"
