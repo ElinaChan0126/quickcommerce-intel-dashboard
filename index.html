@@ -361,7 +361,7 @@
       <div class="candidate-head">
         <div>
           <p class="label">自动候选池</p>
-          <h2>网页与公众号线索统一展示，确认后再进入正式日报</h2>
+          <h2>网页线索统一展示，确认后再进入正式日报</h2>
         </div>
         <div class="module-actions">
           <p class="collection-note" id="candidate-updated">最近抓取：待运行</p>
@@ -2148,7 +2148,7 @@
       if (enrichingCandidateId !== item.id) return "";
       return `
         <div class="candidate-enrich" data-enrich-panel="${item.id}">
-          <label><span>公众号全文</span><textarea data-fulltext-input placeholder="把微信文章正文粘贴到这里，系统会提取事件、摘要、标签和判断">${escapeHtml(item.fullText || "")}</textarea></label>
+          <label><span>补充全文</span><textarea data-fulltext-input placeholder="粘贴来源文章正文，系统会提取事件、摘要、标签和判断">${escapeHtml(item.fullText || "")}</textarea></label>
           <div class="edit-actions">
             <button data-fulltext-parse="${item.id}" type="button">解析并更新候选</button>
             <button data-fulltext-cancel="${item.id}" type="button">取消</button>
@@ -2202,11 +2202,11 @@
       return (selected || item.summary || "").slice(0, 220);
     }
     function judgeFromFullText(text, item, tags, category) {
-      if (tags.includes("Buyer") && category === "AI入口") return "公众号全文显示该动作影响买家入口或下单链路，建议重点复核入口形态、可用城市和履约承接方。";
-      if (tags.includes("Buyer")) return "公众号全文显示该动作与买家侧体验相关，建议复核是否涉及下单路径、价格/时效展示或售后体验变化。";
-      if (tags.includes("Merchant")) return "公众号全文偏商家侧经营或供给建设，建议判断它是否会间接影响买家可得性和履约体验。";
-      if (tags.includes("Driver")) return "公众号全文偏骑手或运力规则，建议关注对时效、供给稳定性和用户履约体验的间接影响。";
-      return item.judge || "已补充公众号全文，建议产品经理复核事件真实性、发布时间和业务影响。";
+      if (tags.includes("Buyer") && category === "AI入口") return "补充全文显示该动作影响买家入口或下单链路，建议重点复核入口形态、可用城市和履约承接方。";
+      if (tags.includes("Buyer")) return "补充全文显示该动作与买家侧体验相关，建议复核是否涉及下单路径、价格/时效展示或售后体验变化。";
+      if (tags.includes("Merchant")) return "补充全文偏商家侧经营或供给建设，建议判断它是否会间接影响买家可得性和履约体验。";
+      if (tags.includes("Driver")) return "补充全文偏骑手或运力规则，建议关注对时效、供给稳定性和用户履约体验的间接影响。";
+      return item.judge || "已补充补充全文，建议产品经理复核事件真实性、发布时间和业务影响。";
     }
     function isLegacyJudge(judge) {
       return /^(自动抓取候选|待产品经理补充判断)/.test((judge || "").trim());
