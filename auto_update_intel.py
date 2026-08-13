@@ -87,6 +87,9 @@ DATA_SOURCES = [
     {"name": "达达集团官网", "domain": "imdada.cn", "focus": "即时配送、京东到家、商家履约", "weight": 8},
     {"name": "京东到家官网", "domain": "jddj.com", "focus": "即时零售、商超便利、平台活动", "weight": 8},
     {"name": "饿了么官网", "domain": "ele.me", "focus": "本地生活、蜂鸟即配、平台活动", "weight": 8},
+    {"name": "阿里巴巴投资者关系", "domain": "home.alibabagroup.com", "focus": "集团战略、业务整合、财报与正式披露", "weight": 10},
+    {"name": "京东投资者关系", "domain": "ir.jd.com", "focus": "集团战略、即时零售投入、财报与正式披露", "weight": 10},
+    {"name": "顺丰同城投资者关系", "domain": "ir.sf-cityrush.com", "focus": "同城配送经营、业绩披露、战略与组织动态", "weight": 10},
 ]
 
 WECHAT_ACCOUNTS = {
@@ -278,6 +281,16 @@ def build_queries(target_month: str | None = None) -> list[str]:
         "site:meituan.com/news 配送 产品",
         "site:ishansong.com/news 跑腿 上线",
     ]
+    enterprise_terms = [
+        "淘宝闪购 饿了么 业务整合 品牌升级 组织调整",
+        "淘宝闪购 饿了么 并入 更名 合并 战略",
+        "京东秒送 京东外卖 业务整合 战略投入 财报",
+        "美团闪购 美团跑腿 组织调整 战略投入 财报",
+        "顺丰同城 即时配送 财报 业绩 战略投入",
+        "site:home.alibabagroup.com 饿了么 淘宝 本地生活 财报",
+        "site:ir.jd.com 即时零售 配送 外卖 财报",
+        "site:ir.sf-cityrush.com 同城配送 业绩 战略",
+    ]
     source_queries = []
     source_focus_term = "即时配送 即时零售 闪购 跑腿 秒送 AI 上线"
     for source in HIGH_SIGNAL_SOURCES:
@@ -292,7 +305,7 @@ def build_queries(target_month: str | None = None) -> list[str]:
         for channel in NEWS_SEARCH_CHANNELS
     ]
     for period in period_labels(target_month):
-        for term in broad_terms + platform_terms + official_news_terms + source_queries + platform_queries + report_queries + news_queries:
+        for term in broad_terms + platform_terms + official_news_terms + enterprise_terms + source_queries + platform_queries + report_queries + news_queries:
             queries.append(f"{period} {term}")
     return queries
 
@@ -391,6 +404,19 @@ KEYWORDS = {
     "配送": 8,
     "服务商": 8,
     "小程序": 8,
+    "合并": 14,
+    "整合": 14,
+    "并入": 16,
+    "更名": 16,
+    "品牌升级": 14,
+    "品牌调整": 14,
+    "名称变更": 16,
+    "组织调整": 14,
+    "财报": 10,
+    "业绩": 8,
+    "季度业绩": 12,
+    "年度业绩": 12,
+    "投资者关系": 10,
 }
 
 NEGATIVE_KEYWORDS = {
@@ -441,6 +467,20 @@ BUYER_DELIVERY_TERMS = ["跑腿", "同城", "即时配送", "同城急送", "一
 BUYER_EXPERIENCE_TERMS = ["体验", "频道", "会场", "搜索", "推荐", "时效", "价格预估", "地址", "手机号", "选择成本", "填写"]
 NON_BUYER_DOMAIN_TERMS = ["商家", "商户", "服务商", "经营", "店铺", "代运营", "培训", "课堂", "智能硬件", "前置仓", "餐饮系统", "骑手", "骑士", "众包", "运力", "超时", "免罚", "骑手权益", "骑士权益"]
 CAPITAL_MARKET_TERMS = ["股价", "证券", "研报", "财报", "融资", "资本市场", "港股", "上市公司"]
+ENTERPRISE_SIGNAL_TERMS = [
+    "合并", "整合", "并入", "更名", "品牌升级", "品牌调整", "名称变更", "业务调整", "组织调整", "架构调整",
+    "战略投入", "战略合作", "收购", "分拆", "剥离", "独立", "财报", "业绩", "季度业绩",
+    "年度业绩", "投资者关系", "业绩公告", "经营数据",
+]
+ENTERPRISE_CATEGORY_TERMS = [
+    "合并", "整合", "并入", "更名", "品牌升级", "品牌调整", "名称变更", "业务调整", "组织调整", "架构调整",
+    "战略投入", "战略合作", "收购", "分拆", "剥离", "独立", "财报", "业绩", "季度业绩",
+    "年度业绩", "投资者关系", "业绩公告", "经营数据",
+]
+ENTERPRISE_PLATFORM_TERMS = [
+    "淘宝闪购", "饿了么", "京东秒送", "京东外卖", "京东到家", "美团闪购", "美团跑腿",
+    "顺丰同城", "闪送", "达达", "蜂鸟即配", "即时零售", "即时配送", "同城配送",
+]
 
 EXCLUDED_URL_PARTS = [
     "douyin.com",
@@ -690,6 +730,8 @@ def platform_from_text(text: str) -> str:
 
 
 def category_from_text(text: str) -> str:
+    if any(word in text for word in ENTERPRISE_CATEGORY_TERMS) and any(word in text for word in ENTERPRISE_PLATFORM_TERMS):
+        return "企业级动向"
     for category, words in CATEGORY_RULES:
         if any(word in text for word in words):
             return category
@@ -967,7 +1009,9 @@ def split_event_text(title: str, description: str) -> list[tuple[str, str]]:
 
 def make_candidate(title: str, description: str, link: str, pub_date: str = "") -> dict | None:
     text = f"{title} {description}"
-    if not any(word in text for word in ["闪购", "即时零售", "跑腿", "秒送", "同城", "外卖", "骑手", "骑士", *PLATFORM_HINTS]):
+    has_enterprise_signal = any(word in text for word in ENTERPRISE_SIGNAL_TERMS)
+    has_enterprise_platform = any(word in text for word in ENTERPRISE_PLATFORM_TERMS)
+    if not any(word in text for word in ["闪购", "即时零售", "跑腿", "秒送", "同城", "外卖", "骑手", "骑士", *PLATFORM_HINTS]) and not (has_enterprise_signal and has_enterprise_platform):
         return None
     score = score_candidate(title, description, link)
     if score < 46:
@@ -1010,6 +1054,8 @@ def candidate_judgment(title: str, summary: str, platform: str, tags: list[str])
     text = f"{title} {summary}"
     subject = platform if platform and platform != "待识别平台" else "该平台"
 
+    if any(word in text for word in ENTERPRISE_CATEGORY_TERMS) and any(word in text for word in ENTERPRISE_PLATFORM_TERMS):
+        return f"{subject}出现企业级调整或正式经营披露；重点关注其是否重划即时零售的品牌归属、组织协同、投入强度或履约边界，并进一步影响买家侧入口与供给竞争。"
     if any(word in text for word in ["支付宝 AI", "AI生态", "AI 生态", "智能体", "Agent", "一句话"]):
         if any(word in text for word in ["跑腿", "同城", "秒送", "配送"]):
             return f"{subject}正将即时配送入口接入 AI 对话场景，用户可从需求表达直接进入下单链路；值得关注 AI 入口对搜索、小程序入口及履约转化的影响。"
