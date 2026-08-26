@@ -291,10 +291,31 @@ def build_queries(target_month: str | None = None) -> list[str]:
         "site:ir.jd.com 即时零售 配送 外卖 财报",
         "site:ir.sf-cityrush.com 同城配送 业绩 战略",
     ]
+    # Do not make a publisher result satisfy every business term at once.
+    # Search engines interpret space-separated Chinese terms close to an AND
+    # query, which made the old query miss a normal article about just one
+    # valid theme such as a FlashEx return order or a merchant-side feature.
+    # A small set of separate, source-scoped queries is broader while still
+    # keeping the results inside the curated publisher inventory.
     source_queries = []
-    source_focus_term = "即时配送 即时零售 闪购 跑腿 秒送 AI 上线"
+    default_source_terms = ["即时零售", "闪购", "跑腿"]
+    source_term_overrides = {
+        "tech.taobao.org": ["即时零售", "配送", "AI"],
+        "tech.meituan.com": ["即时配送", "跑腿", "AI"],
+        "meituan.com": ["即时零售", "闪购", "跑腿"],
+        "sf-cityrush.com": ["同城配送", "跑腿", "AI"],
+        "ishansong.com": ["同城配送", "跑腿", "往返单"],
+        "uupt.com": ["同城配送", "跑腿", "AI"],
+        "imdada.cn": ["即时配送", "秒送", "配送"],
+        "jddj.com": ["即时零售", "秒送", "外卖"],
+        "ele.me": ["即时零售", "闪购", "配送"],
+        "home.alibabagroup.com": ["淘宝闪购", "饿了么", "本地生活"],
+        "ir.jd.com": ["即时零售", "配送", "外卖"],
+        "ir.sf-cityrush.com": ["同城配送", "业绩", "战略"],
+    }
     for source in HIGH_SIGNAL_SOURCES:
-        source_queries.append(f"site:{source['domain']} {source_focus_term}")
+        for term in source_term_overrides.get(source["domain"], default_source_terms):
+            source_queries.append(f"site:{source['domain']} {term}")
     platform_queries = PLATFORM_SEARCH_TERMS
     report_queries = [
         f"{broker} 即时零售 外卖 闪购 美团 京东 阿里 研报"
@@ -307,7 +328,9 @@ def build_queries(target_month: str | None = None) -> list[str]:
     for period in period_labels(target_month):
         for term in broad_terms + platform_terms + official_news_terms + enterprise_terms + source_queries + platform_queries + report_queries + news_queries:
             queries.append(f"{period} {term}")
-    return queries
+    # Keep a stable order for predictable diagnostics and avoid spending a
+    # request on duplicate queries created by overlapping source lists.
+    return list(dict.fromkeys(queries))
 
 
 def source_inventory_count() -> int:
@@ -870,6 +893,18 @@ def _source_date_uncached(url: str) -> str | None:
         body = fetch(url, timeout=8)
     except Exception:
         return None
+
+    # Meituan Tech uses dated article paths such as /2026/06/30/foo.html.
+    # This is a first-party publication date and remains available even when
+    # the page's client-rendered metadata is absent from the fetched HTML.
+    if "tech.meituan.com/" in url:
+        path_date = re.search(r"/(20\d{2})/(0?[1-9]|1[0-2])/([0-3]?\d)/", url)
+        if path_date:
+            year, month, day = path_date.groups()
+            try:
+                return f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
+            except ValueError:
+                pass
 
     # 36氪文章页的标题下方 item-time 是文章真实发布日期；页面其他区域
     # 还会出现推荐内容日期，因此不能直接取第一个 time 标签。
@@ -1642,7 +1677,7 @@ def inject_candidates(
     candidates: list[dict],
     target_month: str | None = None,
     lookback_days: int = 3,
-) -> None:
+) -> dict:
     text = dashboard.read_text(encoding="utf-8")
     collected_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
     existing = [
@@ -1692,6 +1727,7 @@ def inject_candidates(
     # regex replacement would turn error-message "\\n" escapes into real line
     # breaks and make the dashboard JavaScript invalid.
     dashboard.write_text(pattern.sub(lambda _match: block, text), encoding="utf-8")
+    return meta
 
 
 def has_existing_generated_candidates(dashboard: Path) -> bool:
@@ -1718,13 +1754,16 @@ def main() -> None:
     if args.dry_run:
         print(json.dumps(candidates, ensure_ascii=False, indent=2))
         return
-    inject_candidates(args.dashboard, candidates, args.month, args.lookback_days)
+    meta = inject_candidates(args.dashboard, candidates, args.month, args.lookback_days)
     retained = len(read_existing_generated_candidates(args.dashboard))
     status = run_status()
     if status == "completed" and not candidates:
         status = "no_new_content"
     print(json.dumps({"status": status, "searchStats": SEARCH_STATS}, ensure_ascii=False))
-    print(f"updated {args.dashboard} with {len(candidates)} new candidates; {retained} retained candidates")
+    print(
+        f"updated {args.dashboard}: {len(candidates)} raw qualified records, "
+        f"{meta['newCandidateCount']} new events after merge, {retained} retained events"
+    )
 
 
 if __name__ == "__main__":
