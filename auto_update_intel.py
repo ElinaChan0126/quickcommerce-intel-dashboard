@@ -83,6 +83,7 @@ DATA_SOURCES = [
     {"name": "美团官网", "domain": "meituan.com", "focus": "平台官方动态、本地生活、即时零售", "weight": 8},
     {"name": "顺丰同城官网", "domain": "sf-cityrush.com", "focus": "同城急送、骑手权益、平台合作", "weight": 8},
     {"name": "闪送官网", "domain": "ishansong.com", "focus": "一对一急送、产品功能、品牌动态", "weight": 8},
+    {"name": "闪送 App Store", "domain": "apps.apple.com", "focus": "用户端版本更新、下单与服务功能", "weight": 9},
     {"name": "UU跑腿官网", "domain": "uupt.com", "focus": "跑腿服务、AI 下单、开放能力", "weight": 8},
     {"name": "达达集团官网", "domain": "imdada.cn", "focus": "即时配送、京东到家、商家履约", "weight": 8},
     {"name": "京东到家官网", "domain": "jddj.com", "focus": "即时零售、商超便利、平台活动", "weight": 8},
@@ -219,6 +220,10 @@ DIRECT_SOURCE_PAGES = [
     # Use the official news list instead, with a wider first-party recovery
     # window so a newly enabled connector can recover recently missed news.
     {"name": "闪送官网", "url": "https://www.ishansong.com/news/list?type=15", "domain": "ishansong.com", "recoveryDays": 45},
+    # Version history is a first-party product-change log. It is more useful
+    # than press coverage for buyer-side launches that are never announced in
+    # a newsroom post.
+    {"name": "闪送 App Store", "url": "https://apps.apple.com/cn/app/%E9%97%AA%E9%80%81-%E4%B8%80%E5%AF%B9%E4%B8%80%E6%80%A5%E9%80%81/id895374634", "domain": "apps.apple.com", "recoveryDays": 45, "parser": "app_versions"},
     {"name": "UU跑腿官网", "url": "https://www.uupt.com/", "domain": "uupt.com"},
 ]
 
@@ -1295,6 +1300,49 @@ def direct_source_candidates(target_month: str | None, lookback_days: int) -> li
                 SEARCH_STATS["lastErrors"].append(f"direct {source['name']}: {exc}")
             source_health["error"] = type(exc).__name__
             print(f"[warn] direct {source['name']}: {exc}")
+            continue
+
+        if source.get("parser") == "app_versions":
+            # Apple renders each version as a self-contained list item with a
+            # stable ISO date. Keep the full version note as the source text
+            # so feature launches are not lost behind generic release notes.
+            version_blocks = re.findall(
+                r"<li>\s*<div[^>]*class=[\"'][^\"']*\bcontainer detail\b[^\"']*[\"'][^>]*>.*?</li>",
+                page,
+                flags=re.I | re.S,
+            )
+            for block in version_blocks:
+                date_match = re.search(r"<time[^>]*datetime=[\"']([^\"']+)[\"']", block, flags=re.I)
+                version_match = re.search(r"<span[^>]*>\s*([0-9]+(?:\.[0-9]+){1,3})\s*</span>", block, flags=re.I | re.S)
+                note_match = re.search(r"<p[^>]*>(.*?)</p>", block, flags=re.I | re.S)
+                published_date = parse_html_date(date_match.group(1)) if date_match else None
+                version = clean_text(version_match.group(1)) if version_match else ""
+                note = clean_text(note_match.group(1)) if note_match else ""
+                if not published_date or not version or not note:
+                    continue
+                # Keep real capability changes, not the recurring release
+                # note that merely says "minor fixes and performance work".
+                if not any(term in note for term in ["上线", "新增", "支持", "推出", "开放", "功能", "服务"]):
+                    continue
+                source_health["contentLinks"] += 1
+                source_health["articleChecks"] += 1
+                source_health["dateVerified"] += 1
+                try:
+                    published = datetime.fromisoformat(published_date).date()
+                except ValueError:
+                    continue
+                if published < source_window_start or published > window_end:
+                    continue
+                title = f"闪送 App {version} 更新：{note.split('；')[0].split('。')[0]}"
+                for candidate in candidates_from_result(title, note, source["url"]):
+                    candidate["date"] = published_date
+                    candidate["publishedDate"] = published_date
+                    candidate["dateStatus"] = "官方版本日期"
+                    candidate["sourceKind"] = "官方应用版本"
+                    candidate["contentStatus"] = "已读官方版本说明"
+                    collected.append(candidate)
+                    source_candidates += 1
+                    source_health["accepted"] += 1
             continue
 
         # Index markup varies by publisher; collecting visible anchors then
