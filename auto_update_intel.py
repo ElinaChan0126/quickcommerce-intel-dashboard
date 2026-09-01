@@ -72,6 +72,7 @@ DATA_SOURCES = [
     {"name": "京报网", "domain": "news.bjd.com.cn", "focus": "本地服务、AI 入口、平台合作", "weight": 7},
     {"name": "同花顺财经", "domain": "10jqka.com.cn", "focus": "转载快讯、上市公司、平台动态", "weight": 6},
     {"name": "东方财富", "domain": "finance.eastmoney.com", "focus": "上市公司、转载快讯、平台动态", "weight": 6},
+    {"name": "南方网", "domain": "southcn.com", "focus": "企业官方发布、开放平台与本地生活动态", "weight": 8},
     {"name": "上观新闻", "domain": "shobserver.cn", "focus": "公司动态、上海本地服务、行业报道", "weight": 6},
     {"name": "观察者网", "domain": "guancha.cn", "focus": "公司动态、平台经济、行业转载", "weight": 6},
     {"name": "大洋网", "domain": "dayoo.com", "focus": "地方消费、本地生活、民生服务", "weight": 5},
@@ -90,6 +91,7 @@ DATA_SOURCES = [
     {"name": "饿了么官网", "domain": "ele.me", "focus": "本地生活、蜂鸟即配、平台活动", "weight": 8},
     {"name": "阿里巴巴投资者关系", "domain": "home.alibabagroup.com", "focus": "集团战略、业务整合、财报与正式披露", "weight": 10},
     {"name": "京东投资者关系", "domain": "ir.jd.com", "focus": "集团战略、即时零售投入、财报与正式披露", "weight": 10},
+    {"name": "千问开放平台", "domain": "open.qianwen.com", "focus": "AI 对话入口、服务接入、交易履约能力", "weight": 10},
     {"name": "顺丰同城投资者关系", "domain": "ir.sf-cityrush.com", "focus": "同城配送经营、业绩披露、战略与组织动态", "weight": 10},
 ]
 
@@ -215,6 +217,7 @@ DIRECT_SOURCE_PAGES = [
     # category archive provides an independent, rider-related discovery path.
     {"name": "美团骑手保障新闻", "url": "https://www.meituan.com/news?category=6", "domain": "meituan.com", "recoveryDays": 45},
     {"name": "美团技术团队", "url": "https://tech.meituan.com/", "domain": "tech.meituan.com"},
+    {"name": "千问开放平台", "url": "https://open.qianwen.com/", "domain": "open.qianwen.com"},
     {"name": "顺丰同城官网", "url": "https://www.sf-cityrush.com/", "domain": "sf-cityrush.com"},
     # The homepage is marketing-first and does not expose an article archive.
     # Use the official news list instead, with a wider first-party recovery
@@ -280,6 +283,9 @@ def build_queries(target_month: str | None = None) -> list[str]:
         "淘宝闪购 AI 服务商 上线",
         "京东秒送 京东外卖 秒送 活动",
         "美团闪购 即时零售 上线 活动",
+        "闪送 千问开放平台 AI 对话 下单",
+        "淘宝闪购 家宴 灰度测试 到家餐饮",
+        "美团 淘宝闪购 京东外卖 红灯停表",
     ]
     official_news_terms = [
         "site:meituan.com/news 骑手 上线",
@@ -295,6 +301,8 @@ def build_queries(target_month: str | None = None) -> list[str]:
         "site:home.alibabagroup.com 饿了么 淘宝 本地生活 财报",
         "site:ir.jd.com 即时零售 配送 外卖 财报",
         "site:ir.sf-cityrush.com 同城配送 业绩 战略",
+        "淘宝闪购 搜索 组织调整 商品运营",
+        "即时零售 AI 开放平台 服务接入 交易履约",
     ]
     # Do not make a publisher result satisfy every business term at once.
     # Search engines interpret space-separated Chinese terms close to an AND
@@ -317,6 +325,8 @@ def build_queries(target_month: str | None = None) -> list[str]:
         "home.alibabagroup.com": ["淘宝闪购", "饿了么", "本地生活"],
         "ir.jd.com": ["即时零售", "配送", "外卖"],
         "ir.sf-cityrush.com": ["同城配送", "业绩", "战略"],
+        "open.qianwen.com": ["闪送", "淘宝闪购", "交易履约"],
+        "southcn.com": ["闪送", "即时零售", "开放平台"],
     }
     for source in HIGH_SIGNAL_SOURCES:
         for term in source_term_overrides.get(source["domain"], default_source_terms):
@@ -515,6 +525,9 @@ EXCLUDED_URL_PARTS = [
     "post.smzdm.com",
     "workercn.cn",
     "hunantoday.cn",
+    "/keywords/",
+    "/tags/",
+    "/tag/",
 ]
 
 RELATIVE_DATE_PATTERN = re.compile(
@@ -911,6 +924,18 @@ def _source_date_uncached(url: str) -> str | None:
             except ValueError:
                 pass
 
+    # JD IR release PDFs have the issued date in their immutable asset path.
+    # This is a first-party date, unlike a search engine's RSS publication
+    # timestamp, and lets investor disclosures participate in monthly review.
+    if "ir.jd.com/" in url:
+        path_date = re.search(r"/(20\d{2})/(0?[1-9]|1[0-2])/([0-3]?\d)/", url)
+        if path_date:
+            year, month, day = path_date.groups()
+            try:
+                return f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
+            except ValueError:
+                pass
+
     # 36氪文章页的标题下方 item-time 是文章真实发布日期；页面其他区域
     # 还会出现推荐内容日期，因此不能直接取第一个 time 标签。
     if "36kr.com/" in url:
@@ -1048,6 +1073,8 @@ def split_event_text(title: str, description: str) -> list[tuple[str, str]]:
 
 
 def make_candidate(title: str, description: str, link: str, pub_date: str = "") -> dict | None:
+    if "_标签_" in title or any(part in link for part in EXCLUDED_URL_PARTS):
+        return None
     text = f"{title} {description}"
     has_enterprise_signal = any(word in text for word in ENTERPRISE_SIGNAL_TERMS)
     has_enterprise_platform = any(word in text for word in ENTERPRISE_PLATFORM_TERMS)
@@ -1558,6 +1585,13 @@ def read_existing_generated_candidates(dashboard: Path) -> list[dict]:
     return value if isinstance(value, list) else []
 
 
+def read_formal_source_urls(dashboard: Path) -> set[str]:
+    """Return source URLs already promoted into the formal intelligence list."""
+    text = dashboard.read_text(encoding="utf-8")
+    formal_block = text.split("    // AUTO_CANDIDATES_START", 1)[0]
+    return set(re.findall(r'sourceUrl:"([^"]+)"', formal_block))
+
+
 KNOWN_SOURCE_DATES = {
     # 已核对的来源页日期。来源页抓取失败时，不能用当天的抓取日期替代。
     "https://36kr.com/newsflashes/3801697390353922": "2026-05-09",
@@ -1594,37 +1628,36 @@ def refresh_existing_candidate_dates(candidates: list[dict]) -> list[dict]:
             candidate["publishedDate"] = ""
             continue
         url = candidate.get("sourceUrl", "")
+        if "_标签_" in candidate.get("title", "") or any(part in url for part in EXCLUDED_URL_PARTS):
+            candidate["date"] = ""
+            candidate["publishedDate"] = ""
+            continue
         if url in KNOWN_SOURCE_DATES:
             candidate["date"] = KNOWN_SOURCE_DATES[url]
             candidate["publishedDate"] = KNOWN_SOURCE_DATES[url]
             candidate["dateStatus"] = "已验证"
             continue
-        if candidate.get("publishedDate") or candidate.get("date"):
-            # Existing verified or explicitly dated candidates are stable; do
-            # not refetch every article on every scheduled run.
+        if candidate.get("sourceKind") == "官方应用版本":
+            # App Store version records supply their own dated release note,
+            # rather than a separate article page.
             continue
         if "mp.weixin.qq.com" in url:
             continue
-        if candidate.get("score", 0) < 70 or not url:
+        if not url:
+            candidate["date"] = ""
+            candidate["publishedDate"] = ""
             continue
-        if "36kr.com/" in url:
-            actual_date = source_date(url)
-        else:
-            actual_date = source_date(url)
+        # Every retained auto candidate must continue to prove its publication
+        # date from the article page. This prevents historical tag/list pages
+        # or a stale crawl date from surviving in the dashboard indefinitely.
+        actual_date = source_date(url)
         if actual_date and not is_unreliable_current_date(candidate, actual_date):
             candidate["date"] = actual_date
             candidate["publishedDate"] = actual_date
+            candidate["dateStatus"] = "已验证"
             continue
-        if is_unreliable_current_date(candidate, actual_date):
-            candidate["date"] = ""
-            candidate["publishedDate"] = ""
-            continue
-        collected_at = str(candidate.get("collectedAt", ""))[:10]
-        old_date = candidate.get("publishedDate") or candidate.get("date", "")
-        if collected_at and old_date == collected_at:
-            # 旧版本把抓取日写成发布日期，无法验证时直接移除这个错误日期。
-            candidate["date"] = ""
-            candidate["publishedDate"] = ""
+        candidate["date"] = ""
+        candidate["publishedDate"] = ""
     return candidates
 
 
@@ -1728,10 +1761,14 @@ def inject_candidates(
 ) -> dict:
     text = dashboard.read_text(encoding="utf-8")
     collected_at = datetime.now(CN_TZ).strftime("%Y-%m-%d %H:%M")
+    formal_source_urls = read_formal_source_urls(dashboard)
     existing = [
         candidate for candidate in refresh_existing_candidate_dates(read_existing_generated_candidates(dashboard))
-        if "mp.weixin.qq.com" not in candidate.get("sourceUrl", "") and candidate.get("sourceKind") != "公众号"
+        if "mp.weixin.qq.com" not in candidate.get("sourceUrl", "")
+        and candidate.get("sourceKind") != "公众号"
+        and candidate.get("sourceUrl", "") not in formal_source_urls
     ]
+    candidates = [candidate for candidate in candidates if candidate.get("sourceUrl", "") not in formal_source_urls]
     existing_event_keys = {normalized_event_key(candidate) for candidate in existing}
     normalized = normalize_published_fields(existing + candidates, collected_at)
     merged = recent_candidates(merge_candidates(normalized))
