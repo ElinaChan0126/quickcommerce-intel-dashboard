@@ -1901,7 +1901,7 @@
         sourceCount: 2
       });
     }
-    generatedMeta.updatedAt = "2026-09-29 10:05";
+    generatedMeta.updatedAt = "2026-09-29 17:02";
     generatedMeta.candidateCount = generatedCandidates.length;
     generatedMeta.newCandidateCount = 0;
     generatedMeta.status = "completed";
@@ -1914,16 +1914,17 @@
       engineSuccesses: 16,
       engineFailures: 0,
       directRequests: 20,
-      directSuccesses: 15,
-      directFailures: 5,
+      directSuccesses: 11,
+      directFailures: 9,
       directSources: {
-        "美团新闻、规则与 App Store": { contentLinks: 8, articleChecks: 4, dateVerified: 4, accepted: 0 },
-        "淘宝闪购与商家 App Store": { contentLinks: 5, articleChecks: 3, dateVerified: 3, accepted: 0 },
-        "京东秒送、京东外卖与投资者关系": { contentLinks: 6, articleChecks: 3, dateVerified: 3, accepted: 0 },
-        "顺丰同城、闪送与达达": { contentLinks: 7, articleChecks: 4, dateVerified: 3, accepted: 0 },
-        "可信媒体交叉检索": { contentLinks: 6, articleChecks: 2, dateVerified: 1, accepted: 0 }
+        "美团新闻、规则与 App Store": { contentLinks: 8, articleChecks: 4, dateVerified: 3, accepted: 0 },
+        "淘宝闪购与商家 App Store": { contentLinks: 5, articleChecks: 3, dateVerified: 2, accepted: 0 },
+        "京东秒送、京东外卖与投资者关系": { contentLinks: 6, articleChecks: 4, dateVerified: 3, accepted: 0 },
+        "阿里巴巴正式披露": { contentLinks: 2, articleChecks: 2, dateVerified: 1, accepted: 0 },
+        "顺丰同城、闪送与达达": { contentLinks: 7, articleChecks: 5, dateVerified: 2, accepted: 0 },
+        "可信媒体交叉检索": { contentLinks: 6, articleChecks: 2, dateVerified: 0, accepted: 0 }
       },
-      lastErrors: ["本次按日常规则核查 2026 年 9 月 27 日至 9 月 29 日，并补看上次完成后的新增页面；未发现新的独立事件，generatedCandidates 保持 57 条，baseIntel 保持 16 条且未改动", "美团新闻中心最新可核验相关披露仍为 9 月 23 日放心外卖七项行动；App Store 的小团专属入口说明至少自 8 月 20 日版本已存在，且候选池已有 9 月 9 日小团能力事件，未重复新增", "淘宝闪购商家版 14.8.5 与顺丰同城急送 10.4.0 均仅披露稳定性或笼统功能更新，没有足以独立成条的功能细节；淘宝主 App 窗口内版本说明也未出现新的闪购能力", "京东投资者关系最新正式披露仍为 8 月 13 日二季度业绩；京东秒送开放平台最新带日期公告仍为 7 月 16 日商家自送轨迹回传要求，Q4 迁移提示仍无可核验发布日期", "闪送官网最新可核验产品事件仍为 7 月 15 日往返单；达达业务页未出现带发布日期的新披露，顺丰同城投资者关系未检出 9 月 27 日至 29 日新公告", "5 次直连失败来自 Apple Lookup API 与个别 App Store 页面读取错误，已用可访问的 App Store 原页及官网交叉核验，不影响本次无新增结论", "按规则未抓取公众号或小红书；排除了聚合页、无日期页面、旧闻、重复事件、常规促销以及用搜索时间、抓取时间或页面更新日冒充发布日期的结果"]
+      lastErrors: ["本次按日常规则核查 2026 年 9 月 27 日至 9 月 29 日，并重点补看上次 10:08 完成后的新增页面；未发现新的独立事件，generatedCandidates 保持 57 条，baseIntel 保持 16 条且未改动", "美团新闻中心最新可核验相关披露仍为 9 月 23 日放心外卖七项行动；未发现 9 月 27 日至 29 日新增的闪购、外卖、跑腿、商家或骑手产品披露", "淘宝闪购商家版 14.8.5 与顺丰同城急送 10.4.0 均仅披露稳定性或笼统功能更新，没有足以独立成条的功能细节；App Store 的相对时间仅用于定位版本，未作为事件发布日期", "京东投资者关系最新正式披露仍为 8 月 13 日二季度业绩；京东秒送开放平台最新带日期公告仍为 7 月 16 日商家自送轨迹回传要求，Q4 迁移提示仍无可核验发布日期", "阿里巴巴最新可核验季度业绩披露为 8 月 20 日；闪送官网最新可核验产品事件仍为 7 月 15 日往返单；达达业务页与顺丰同城官网未出现窗口内带发布日期的新披露", "9 次直连失败主要来自美团页面超时、App Store 短链接不可访问及顺丰同城官网读取错误；已用可访问的官方原页、搜索结果正文与其他官方入口交叉核验，不影响本次无新增结论", "按规则未抓取公众号或小红书；排除了聚合页、无日期页面、旧闻、重复事件、常规促销以及用搜索时间、抓取时间或页面更新日冒充发布日期的结果"]
     };
     // AUTO_CANDIDATES_END
     const storageKey = "quick-commerce-intel-custom-items";
