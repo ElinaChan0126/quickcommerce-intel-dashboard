@@ -666,6 +666,7 @@
     const itemEditKey = "quick-commerce-intel-item-edits";
     const removedIntelKey = "quick-commerce-intel-removed-items";
     const candidateEnrichmentKey = "quick-commerce-intel-candidate-enrichments";
+    const purgedCandidateIdentityKey = "quick-commerce-intel-purged-candidate-identities";
     const sfAlipayRecoveryKey = "quick-commerce-intel-recover-sf-alipay-ai-20260710";
     const trashRetentionDays = 30;
     const els = {
@@ -713,6 +714,8 @@
     const setIgnored = items => localStorage.setItem(ignoredCandidateKey, JSON.stringify(items));
     const getPurged = () => JSON.parse(localStorage.getItem(purgedCandidateKey) || "[]");
     const setPurged = items => localStorage.setItem(purgedCandidateKey, JSON.stringify(items));
+    const getPurgedCandidateIdentities = () => JSON.parse(localStorage.getItem(purgedCandidateIdentityKey) || "[]");
+    const setPurgedCandidateIdentities = identities => localStorage.setItem(purgedCandidateIdentityKey, JSON.stringify([...new Set(identities.filter(Boolean))]));
     const getTagOverrides = () => JSON.parse(localStorage.getItem(tagOverrideKey) || "{}");
     const setTagOverrides = overrides => localStorage.setItem(tagOverrideKey, JSON.stringify(overrides));
     const getSourceWeightOverrides = () => JSON.parse(localStorage.getItem(sourceWeightOverrideKey) || "{}");
@@ -778,8 +781,45 @@
     function itemCandidateIds(item) {
       return [...new Set([item.id, ...((item && item.candidateIds) || [])].filter(Boolean))];
     }
+    function normalizedIdentityText(value) {
+      return String(value || "")
+        .toLowerCase()
+        .replace(/[\s\-—_·,.，。:：;；!?！？()（）\[\]【】]/g, "")
+        .slice(0, 140);
+    }
+    function canonicalSourceUrl(value) {
+      try {
+        const url = new URL(value);
+        return `${url.hostname.toLowerCase()}${url.pathname.replace(/\/$/, "")}`;
+      } catch (_) {
+        return String(value || "").split(/[?#]/)[0].trim().toLowerCase();
+      }
+    }
+    function candidateIdentityKeys(item) {
+      const keys = [];
+      const event = normalizedIdentityText(item?.eventKey);
+      const platform = normalizedIdentityText(eventPlatform(item || {}));
+      const title = normalizedIdentityText(item?.title);
+      if (event) keys.push(`event:${event}`);
+      if (platform && title) keys.push(`title:${platform}|${title}`);
+      itemSources(item || {}).forEach(source => {
+        const url = canonicalSourceUrl(source.url);
+        if (url) keys.push(`url:${url}`);
+      });
+      return [...new Set(keys)];
+    }
+    function sameCandidateIdentity(record, item) {
+      const recordKeys = new Set(record.identityKeys || candidateIdentityKeys(record.item || record));
+      return candidateIdentityKeys(item).some(key => recordKeys.has(key));
+    }
     function addPurgedIds(ids) {
       setPurged([...new Set([...getPurged(), ...ids.filter(Boolean)])]);
+    }
+    function addPurgedCandidateIdentities(items) {
+      setPurgedCandidateIdentities([
+        ...getPurgedCandidateIdentities(),
+        ...items.flatMap(candidateIdentityKeys)
+      ]);
     }
     function normalizeTrashRecord(entry) {
       if (typeof entry === "string") {
@@ -795,6 +835,7 @@
         origin: entry.origin || (kind === "intel" ? "custom" : "candidate"),
         originalItemId,
         candidateIds: kind === "intel" ? [] : [...new Set([id, ...((entry.candidateIds || item?.candidateIds || []))].filter(Boolean))],
+        identityKeys: kind === "intel" ? [] : [...new Set(entry.identityKeys || candidateIdentityKeys(item || entry))],
         deletedAt: entry.deletedAt || localDateISO(),
         item
       };
@@ -806,7 +847,10 @@
       const expiredIds = [];
       normalized.forEach(record => {
         if (trashDaysLeft(record) > 0) alive.push(record);
-        else expiredIds.push(...record.candidateIds);
+        else {
+          expiredIds.push(...record.candidateIds);
+          if (record.kind !== "intel") addPurgedCandidateIdentities([record.item || record]);
+        }
       });
       if (expiredIds.length) addPurgedIds(expiredIds);
       if (alive.length !== raw.length || raw.some((entry, index) => typeof entry === "string" || entry.deletedAt !== alive[index]?.deletedAt)) {
@@ -820,6 +864,18 @@
     function hiddenCandidateIds() {
       const trashIds = getTrash().flatMap(record => record.candidateIds);
       return new Set([...trashIds, ...getPurged()]);
+    }
+    function hiddenCandidateIdentityKeys() {
+      return new Set([
+        ...getPurgedCandidateIdentities(),
+        ...getTrash().flatMap(record => record.identityKeys || candidateIdentityKeys(record.item || record))
+      ]);
+    }
+    function isHiddenCandidate(item) {
+      const hiddenIds = hiddenCandidateIds();
+      if (itemCandidateIds(item).some(id => hiddenIds.has(id))) return true;
+      const hiddenIdentities = hiddenCandidateIdentityKeys();
+      return candidateIdentityKeys(item).some(key => hiddenIdentities.has(key));
     }
     function unique(values, first) { return [first, ...Array.from(new Set(values))]; }
     function optionList(select, values) { select.innerHTML = values.map(v => `<option>${v}</option>`).join(""); }
@@ -1522,9 +1578,8 @@
     }
     function currentCandidates() {
       const existingUrls = new Set(allItems().flatMap(item => itemSources(item).map(source => source.url)));
-      const hiddenIds = hiddenCandidateIds();
       return candidatePool()
-        .filter(item => !hiddenIds.has(item.id) && !(item.candidateIds || []).some(id => hiddenIds.has(id)))
+        .filter(item => !isHiddenCandidate(item))
         .filter(item => !itemSources(item).some(source => existingUrls.has(source.url)))
         .filter(inSelectedMonth)
         .sort((a, b) => candidateScore(b) - candidateScore(a));
@@ -1611,14 +1666,23 @@
     }
     function recycleCandidate(item) {
       const ids = itemCandidateIds(item);
-      const next = getTrash().filter(record => !record.candidateIds.some(id => ids.includes(id)));
+      const next = getTrash().filter(record => !record.candidateIds.some(id => ids.includes(id)) && !sameCandidateIdentity(record, item));
       const snapshot = {
         ...item,
         sources: itemSources(item),
         businessTags: businessTagsOf(item),
         businessTag: businessTagsOf(item)[0] || ""
       };
-      setTrash([{ id: item.id, kind: "candidate", origin: "candidate", originalItemId: item.id, candidateIds: ids, deletedAt: localDateISO(), item: snapshot }, ...next]);
+      setTrash([{
+        id: item.id,
+        kind: "candidate",
+        origin: "candidate",
+        originalItemId: item.id,
+        candidateIds: ids,
+        identityKeys: candidateIdentityKeys(snapshot),
+        deletedAt: localDateISO(),
+        item: snapshot
+      }, ...next]);
     }
     function recycleIntelItem(itemId) {
       const item = allItems().find(candidate => candidate.id === itemId);
@@ -1647,7 +1711,10 @@
     }
     function purgeTrashRecord(recordId) {
       const record = getTrash().find(item => item.id === recordId);
-      if (record && record.kind !== "intel") addPurgedIds(record.candidateIds);
+      if (record && record.kind !== "intel") {
+        addPurgedIds(record.candidateIds);
+        addPurgedCandidateIdentities([record.item || record]);
+      }
       removeTrashRecord(recordId);
     }
     function restoreTrashRecord(recordId) {
