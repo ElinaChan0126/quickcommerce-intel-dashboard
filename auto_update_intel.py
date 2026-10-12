@@ -1312,10 +1312,11 @@ def direct_source_candidates(target_month: str | None, lookback_days: int) -> li
             "accepted": 0,
         }
         SEARCH_STATS["directSources"][source["name"]] = source_health
+        # Keep first-party indexes inside the same window as search results.
+        # A wider per-source recovery window repeatedly reintroduced verified
+        # old articles during daily runs, even though weekly/monthly backfills
+        # already provide the supported path for recovering missed coverage.
         source_window_start = window_start
-        if not target_month and source.get("recoveryDays"):
-            recovery_start = datetime.now(CN_TZ).date() - timedelta(days=int(source["recoveryDays"]) - 1)
-            source_window_start = min(source_window_start, recovery_start)
         SEARCH_STATS["directRequests"] += 1
         try:
             page = fetch(source["url"], timeout=10)
