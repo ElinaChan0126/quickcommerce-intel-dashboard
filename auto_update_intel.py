@@ -1026,6 +1026,13 @@ def normalized_event_key(candidate: dict) -> str:
     text = f"{candidate.get('title', '')} {candidate.get('summary', '')}"
     clean = business_text(text)
     compact = re.sub(r"\s+", "", clean)
+    # Do not collapse a city-level rollout into the earlier nationwide labor-rule
+    # agreement merely because both mention riders, delivery and red-light timing.
+    # The rollout adds merchant-side meal-status hardware and is a separate event.
+    if "杭州" in compact and "出餐自拍" in compact:
+        return "美团|配送体验|杭州|红灯停表|出餐自拍"
+    if "算法协商" in compact and any(word in compact for word in ["难配送", "计费权重", "二次配送补贴"]):
+        return "美团|配送体验|算法协商|难配送计费|骑手保障"
     if "美团" in compact and "跑腿" in compact and any(word in compact for word in ["Skill", "AI助手", "Agent"]):
         return "美团跑腿|AI入口|美团跑腿Skill接入AI助手"
     if "顺丰" in compact and any(word in compact for word in ["支付宝", "阿宝"]) and "AI" in compact:
